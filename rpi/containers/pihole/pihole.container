@@ -7,7 +7,7 @@ Image=docker.io/pihole/pihole:latest
 AutoUpdate=registry
 AddCapability=CAP_NET_ADMIN
 
-HealthCmd="curl -k https://127.0.0.1:443"
+# HealthCmd="curl -k https://127.0.0.1:443"
 
 Network=devops.network
 HostName=pihole

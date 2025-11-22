@@ -11,6 +11,7 @@ HealthCmd="curl -k https://127.0.0.1:443"
 
 Network=devops.network
 HostName=pihole
+PublishPort=10080:80
 PublishPort=10443:443
 PublishPort=10.0.0.168:53:53/tcp
 PublishPort=10.0.0.168:53:53/udp
@@ -18,10 +19,10 @@ PublishPort=10.0.0.168:53:53/udp
 Environment=TZ=America/New_York
 Environment=FTLCONF_dns_listeningMode=all
 
-Volume=pihole-data:/etc/pihole:z
-Volume=%h/Homelab/hosts/optiplex/pihole/.certs/optiplex.root.cert:/etc/pihole/tls_ca.crt:z
-Volume=%h/Homelab/hosts/optiplex/pihole/.certs/optiplex.lan.cert:/etc/pihole/tls.crt:z
-Volume=%h/Homelab/hosts/optiplex/pihole/.certs/optiplex.lan.pem:/etc/pihole/tls.pem:z
+Volume=pihole:/etc/pihole:z
+# Volume=%h/Homelab/hosts/optiplex/pihole/.certs/optiplex.root.cert:/etc/pihole/tls_ca.crt:z
+# Volume=%h/Homelab/hosts/optiplex/pihole/.certs/optiplex.lan.cert:/etc/pihole/tls.crt:z
+# Volume=%h/Homelab/hosts/optiplex/pihole/.certs/optiplex.lan.pem:/etc/pihole/tls.pem:z
 
 [Service]
 Restart=always

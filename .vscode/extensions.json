@@ -1,6 +1,7 @@
 {
     "recommendations": [
         "timonwong.shellcheck",
-        "yzhang.markdown-all-in-one"
+        "yzhang.markdown-all-in-one",
+        "hangxingliu.vscode-systemd-support"
     ]
 }

@@ -23,9 +23,9 @@ Volume=pihole:/etc/pihole:z
 # Volume=%h/Homelab/hosts/optiplex/pihole/.certs/optiplex.lan.cert:/etc/pihole/tls.crt:z
 # Volume=%h/Homelab/hosts/optiplex/pihole/.certs/optiplex.lan.pem:/etc/pihole/tls.pem:z
 
-# [Service]
-# Restart=always
-# TimeoutStartSec=1000
+[Service]
+Restart=always
+TimeoutStartSec=1000
 
 [Install]
 WantedBy=default.target

@@ -61,6 +61,8 @@ enable_services()
 configure_podman()
 {
     sudo loginctl enable-linger devops
+    sudo echo "net.ipv4.ip_unprivileged_port_start = 0" >> "/etc/sysctl.conf"
+    sudo sysctl --system
 }
 
 main

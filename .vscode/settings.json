@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "*.container": "systemd-unit-file",
+        "*.network": "systemd-unit-file",
+        "*.volume": "systemd-unit-file",
+        "*.container.test": "systemd-unit-file",
+        "*.network.test": "systemd-unit-file",
+        "*.volume.test": "systemd-unit-file"
+    }
+}

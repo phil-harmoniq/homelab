@@ -14,7 +14,7 @@ link_containers()
     quadlet_dir="$HOME/.config/containers/systemd"
     containers_dir="$(realpath "$script_dir"/containers)"
     # quadlet_dir="/tmp/containers"
-    mkdir "$quadlet_dir"
+    mkdir -p "$quadlet_dir"
 
     # https://unix.stackexchange.com/questions/314974/how-to-delete-broken-symlinks-in-one-go
     echo "Cleaning up broken symlinks at $quadlet_dir"

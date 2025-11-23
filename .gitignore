@@ -1,0 +1,7 @@
+# Ignore secrets
+**/.secrets/**
+**/*.secret
+**/.certs/**
+
+# Include markdown documentation
+!**/*.md

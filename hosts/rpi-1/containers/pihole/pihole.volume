@@ -1,0 +1,5 @@
+[Unit]
+Description=Pihole Volume
+
+[Volume]
+VolumeName=pihole.volume

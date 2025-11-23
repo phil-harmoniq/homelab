@@ -11,7 +11,8 @@ AddCapability=CAP_NET_ADMIN
 
 Network=devops.network
 HostName=pihole
-PublishPort=10080:80
+# 10080 unsafe port: https://www.reddit.com/r/sysadmin/comments/npnhhn/err_unsafe_port_in_chrome/
+PublishPort=10088:80
 PublishPort=10443:443
 PublishPort=53:53
 

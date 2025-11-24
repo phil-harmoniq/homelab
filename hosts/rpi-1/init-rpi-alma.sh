@@ -50,12 +50,15 @@ install_packages()
         samba-client \
         cifs-utils \
         nfs-utils \
+        pcp \
+        python3-pcp \
         -y
 }
 
 enable_services()
 {
     sudo systemctl enable --now cockpit
+    sudo systemctl enable --now pmlogger
 }
 
 configure_podman()

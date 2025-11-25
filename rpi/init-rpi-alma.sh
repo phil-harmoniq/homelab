@@ -50,19 +50,20 @@ install_packages()
         samba-client \
         cifs-utils \
         nfs-utils \
+        pcp \
+        python3-pcp \
         -y
 }
 
 enable_services()
 {
     sudo systemctl enable --now cockpit
+    sudo systemctl enable --now pmlogger
 }
 
 configure_podman()
 {
     sudo loginctl enable-linger devops
-    sudo echo "net.ipv4.ip_unprivileged_port_start = 0" >> "/etc/sysctl.conf"
-    sudo sysctl --system
 }
 
 main

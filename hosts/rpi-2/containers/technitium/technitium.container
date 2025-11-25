@@ -1,7 +1,7 @@
 [Container]
-ContainerName=technitium-1
-Environment=DNS_SERVER_DOMAIN=technitium-1
-HostName=technitium-1
+ContainerName=technitium-2
+Environment=DNS_SERVER_DOMAIN=technitium-2
+HostName=technitium-2
 Image=docker.io/technitium/dns-server:14.2.0
 PublishPort=5380:5380/tcp
 PublishPort=53443:53443/tcp

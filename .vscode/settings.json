@@ -6,5 +6,6 @@
         "*.container.test": "systemd-unit-file",
         "*.network.test": "systemd-unit-file",
         "*.volume.test": "systemd-unit-file"
-    }
+    },
+    "hediet.vscode-drawio.appearance": "automatic"
 }

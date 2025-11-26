@@ -2,6 +2,7 @@
     "recommendations": [
         "timonwong.shellcheck",
         "yzhang.markdown-all-in-one",
-        "hangxingliu.vscode-systemd-support"
+        "hangxingliu.vscode-systemd-support",
+        "hediet.vscode-drawio"
     ]
 }

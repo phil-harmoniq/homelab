@@ -10,5 +10,5 @@ PublishPort=53:53/tcp
 Sysctl="net.ipv4.ip_local_port_range=1024 65535"
 Volume=technitium:/etc/dns
 
-# [Service]
-# Restart=always
+[Service]
+Restart=always

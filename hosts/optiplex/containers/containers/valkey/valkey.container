@@ -1,0 +1,32 @@
+[Unit]
+Description=Valkey cache
+
+[Container]
+ContainerName=valkey
+Image=docker.io/valkey/valkey:8
+AutoUpdate=registry
+Exec=valkey-server --supervised systemd
+Notify=true
+
+HealthCmd="valkey-cli ping"
+
+Network=devops.network
+HostName=valkey
+PublishPort=6379:6379
+
+Environment=VALKEY_TLS_ENABLED=yes
+Environment=VALKEY_TLS_CERT_FILE=/certs/valkey.lab.cert
+Environment=VALKEY_TLS_KEY_FILE=/certs/valkey.lab.key
+Environment=VALKEY_TLS_CA_FILE=/certs/optiplex.root.cert
+
+Volume=valkey-data:/data:z
+Volume=%h/Optiplex/containers/.certs/valkey.lab/valkey.lab.key:/certs/valkey.lab.key:Z
+Volume=%h/Optiplex/containers/.certs/valkey.lab/valkey.lab.cert:/certs/valkey.lab.cert:Z
+Volume=%h/Optiplex/containers/.certs/optiplex.root.cert:/certs/optiplex.root.cert:Z
+
+[Service]
+Restart=always
+TimeoutStartSec=1000
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,5 @@
+[Unit]
+Description=Filebrowser Config Volume
+
+[Volume]
+VolumeName=filebrowser-config.volume

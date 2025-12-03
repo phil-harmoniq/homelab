@@ -1,0 +1,32 @@
+[Container]
+Image=docker.io/jellyfin/jellyfin:latest
+ContainerName=jellyfin
+# Host networking is simplest for local LAN streaming
+Network=devops
+GroupAdd=122
+AddDevice=/dev/dri/renderD128:/dev/dri/renderD128
+
+# Use named volumes defined below
+Volume=jellyfin-config:/config:Z
+Volume=/mnt/Archive/Media:/media:z
+
+# HTTPS support: expose ports if not using host network
+# (comment these out if using Network=host)
+PublishPort=8096:8096/tcp
+PublishPort=8920:8920/tcp
+
+# Optional: set environment variables
+Environment=TZ=America/New_York
+Environment=PUID=1000
+Environment=PGID=1000
+
+# Restart behavior
+# [Service]
+# Restart=on-failure
+# TimeoutStopSec=70
+
+# Optional: for hardware acceleration (Intel iGPU example)
+# Device=/dev/dri/renderD128
+
+[Install]
+WantedBy=default.target

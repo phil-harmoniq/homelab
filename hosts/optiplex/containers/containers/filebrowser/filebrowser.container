@@ -1,0 +1,20 @@
+[Container]
+Image=docker.io/filebrowser/filebrowser:s6
+# Network=devops.network
+
+# Volumes
+Volume=%h/.local/share/Data:/srv:z
+Volume=filebrowser-database:/database:Z
+Volume=filebrowser-config:/config:Z
+# Volume=qbittorrent-downloads:/Downloads:Z
+Environment=PUID=1000
+Environment=PGID=1000
+
+# Ports
+PublishPort=8088:80
+
+# (Optional) Restart behavior
+# Restart=always
+
+# (Optional) Name of the container
+ContainerName=filebrowser

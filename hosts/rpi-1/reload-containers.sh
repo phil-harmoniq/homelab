@@ -11,7 +11,8 @@ main()
 
 link_containers()
 {
-    quadlet_dir="$HOME/.config/containers/systemd"
+    # quadlet_dir="$HOME/.config/containers/systemd"
+    quadlet_dir="/etc/containers/systemd/"
     containers_dir="$(realpath "$script_dir"/containers)"
     # quadlet_dir="/tmp/containers"
     mkdir -p "$quadlet_dir"
@@ -28,7 +29,7 @@ link_containers()
     find "$containers_dir" -type f -name "*.container" -print0 | xargs -0 ln -s -f -t "$quadlet_dir" # Containers
 
     echo "Reloading systemctl to update quadlet files."
-    systemctl --user daemon-reload
+    systemctl daemon-reload
 }
 
 run_services()

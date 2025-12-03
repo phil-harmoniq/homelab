@@ -1,0 +1,37 @@
+[Unit]
+Description=Patroni PostgreSQL Node (rpi-1)
+After=etcd.service
+Requires=etcd.service
+
+[Container]
+Image=quay.io/ongres/patroni:latest
+ContainerName=patroni
+Hostname=patroni
+Network=host
+Volume=postgres-data:/var/lib/postgresql/data
+
+# Patroni identity
+Environment=PATRONI_SCOPE=cluster1
+Environment=PATRONI_NAME=rpi-1
+
+# Patroni REST API
+Environment=PATRONI_RESTAPI_LISTEN=0.0.0.0:8008
+Environment=PATRONI_RESTAPI_CONNECT_ADDRESS=rpi-1:8008
+
+# Etcd cluster (hostname-based)
+Environment=PATRONI_ETCD_HOSTS=rpi-1:2379,rpi-2:2379
+
+# PostgreSQL settings
+Environment=PATRONI_POSTGRESQL_DATA_DIR=/var/lib/postgresql/data
+Environment=PATRONI_POSTGRESQL_LISTEN=0.0.0.0:5432
+Environment=PATRONI_POSTGRESQL_CONNECT_ADDRESS=rpi-1:5432
+
+# Replication parameters
+Environment=PATRONI_POSTGRESQL_PARAMETERS_WAL_LEVEL=replica
+Environment=PATRONI_POSTGRESQL_PARAMETERS_HOT_STANDBY=on
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

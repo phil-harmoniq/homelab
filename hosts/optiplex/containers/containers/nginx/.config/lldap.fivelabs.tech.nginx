@@ -1,0 +1,20 @@
+listen 443 ssl http2;
+include conf.d/include/ssl-ciphers.conf;
+include conf.d/include/force-ssl.conf;
+ssl_certificate /data/custom_ssl/lldap.fivelabs.tech/fullchain.pem;
+ssl_certificate_key /data/custom_ssl/lldap.fivelabs.tech/privkey.pem;
+
+location / {
+    proxy_pass http://lldap:17170;
+
+    # Required headers so Gitea knows the original request was HTTPS
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-Ssl on;
+    proxy_set_header X-Forwarded-Host $host;
+
+    client_max_body_size 100M;
+    proxy_pass_request_headers on;
+}

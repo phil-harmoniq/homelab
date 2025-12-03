@@ -1,0 +1,30 @@
+[Unit]
+Description=Pgadmin Postgres web UI
+Requires=postgres.service
+After=postgres.service
+
+[Container]
+ContainerName=pgadmin
+Image=docker.io/dpage/pgadmin4:9
+AutoUpdate=registry
+
+HealthCmd="wget -O - --no-check-certificate https://localhost:443/misc/ping"
+
+Network=devops.network
+HostName=pgadmin
+PublishPort=8443:443
+
+Environment="PGADMIN_DEFAULT_EMAIL=admin@optiplex.lan"
+Environment="PGADMIN_DEFAULT_PASSWORD=admin"
+Environment="PGADMIN_ENABLE_TLS=True"
+
+Volume=pgadmin-data:/var/lib/pgadmin:z
+Volume=%h/Homelab/hosts/optiplex/.certs/optiplex.lan.key:/certs/server.key:z
+Volume=%h/Homelab/hosts/optiplex/.certs/optiplex.lan.cert:/certs/server.cert:z
+
+[Service]
+Restart=always
+TimeoutStartSec=1000
+
+[Install]
+WantedBy=default.target

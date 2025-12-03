@@ -3,37 +3,33 @@
 set -euo pipefail
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-main()
-{
-    link_containers
+main() {
+    copy_containers
     # run_services
 }
 
-link_containers()
-{
-    # quadlet_dir="$HOME/.config/containers/systemd"
+copy_containers() {
     quadlet_dir="/etc/containers/systemd/"
     containers_dir="$(realpath "$script_dir"/containers)"
-    # quadlet_dir="/tmp/containers"
     mkdir -p "$quadlet_dir"
 
-    # https://unix.stackexchange.com/questions/314974/how-to-delete-broken-symlinks-in-one-go
+    # Clean up broken symlinks at the destination
     echo "Cleaning up broken symlinks at $quadlet_dir"
     find "$quadlet_dir" -xtype l -delete
-    
-    echo "Linking podman quadlet files from $containers_dir to $quadlet_dir."
+
+    echo "Copying podman quadlet files from $containers_dir to $quadlet_dir."
     mkdir -p "$quadlet_dir"
 
-    find "$containers_dir" -type f -name "*.network" -print0 | xargs -0 ln -s -f -t "$quadlet_dir" # Networks
-    find "$containers_dir" -type f -name "*.volume" -print0 | xargs -0 ln -s -f -t "$quadlet_dir" # Volumes
-    find "$containers_dir" -type f -name "*.container" -print0 | xargs -0 ln -s -f -t "$quadlet_dir" # Containers
+    # Copy files instead of linking
+    find "$containers_dir" -type f -name "*.network" -exec cp -f {} "$quadlet_dir" \;   # Networks
+    find "$containers_dir" -type f -name "*.volume" -exec cp -f {} "$quadlet_dir" \;    # Volumes
+    find "$containers_dir" -type f -name "*.container" -exec cp -f {} "$quadlet_dir" \; # Containers
 
     echo "Reloading systemctl to update quadlet files."
     systemctl daemon-reload
 }
 
-run_services()
-{
+run_services() {
     echo "Starting services."
 
     systemctl --user start postgres

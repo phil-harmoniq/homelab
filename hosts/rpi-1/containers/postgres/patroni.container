@@ -6,7 +6,6 @@ Requires=etcd.service
 [Container]
 Image=quay.io/ongres/patroni:latest
 ContainerName=patroni
-Hostname=patroni
 Network=host
 Volume=postgres-data:/var/lib/postgresql/data
 
@@ -32,6 +31,8 @@ Environment=PATRONI_POSTGRESQL_PARAMETERS_HOT_STANDBY=on
 
 [Service]
 Restart=always
+Delegate=yes
+RestartSec=2
 
 [Install]
 WantedBy=multi-user.target

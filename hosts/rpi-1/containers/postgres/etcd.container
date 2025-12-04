@@ -1,0 +1,26 @@
+[Unit]
+Description=Etcd on rpi-1
+Requires=etcd-volume.service
+
+[Container]
+Image=quay.io/coreos/etcd:v3.6.6
+ContainerName=etcd
+Network=host
+Volume=etcd-data:/etcd-data
+
+# Basic identity
+Environment=ETCD_NAME=rpi-1
+Environment=ETCD_DATA_DIR=/etcd-data
+
+# Advertised/Listen URLs (hostname-based)
+Environment=ETCD_INITIAL_ADVERTISE_PEER_URLS=http://rpi-1:2380
+Environment=ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+Environment=ETCD_ADVERTISE_CLIENT_URLS=http://rpi-1:2379
+Environment=ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+
+# Cluster definition
+Environment=ETCD_INITIAL_CLUSTER=rpi-1=http://rpi-1:2380,rpi-2=http://rpi-2:2380
+Environment=ETCD_INITIAL_CLUSTER_STATE=new
+
+[Install]
+WantedBy=multi-user.target

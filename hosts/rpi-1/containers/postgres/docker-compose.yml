@@ -1,0 +1,39 @@
+version: '3'
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.1
+    container_name: patroni_etcd
+    environment:
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://rpi-1:2379  # Use the hostname rpi-1
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://rpi-1:2380  # Use rpi-1
+      - ETCD_INITIAL_CLUSTER=etcd0=http://rpi-1:2380  # Use rpi-1
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster-1
+      - ETCD_INITIAL_CLUSTER_STATE=new
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    volumes:
+      - patroni_etcd_data:/etcd-data
+
+  patroni:
+    image: patroni:latest
+    container_name: patroni
+    environment:
+      - PATRONI_ETCD_HOST=rpi-1:2379  # Use rpi-1 as the etcd host
+      - PATRONI_NAMESPACE=/service
+      - PATRONI_NAME=postgres-1  # Name this node postgres-1 for Machine 1
+      - PATRONI_REPLICATION_PASSWORD=replica_pass
+      - PATRONI_SUPERUSER_PASSWORD=superuser_pass
+      - PATRONI_LISTEN=0.0.0.0:5432
+      - PATRONI_CONNECT_ADDRESS=rpi-1:5432  # Use rpi-1 as the connection address
+      - PATRONI_DB_URL=postgresql://postgres:superuser_pass@rpi-1:5432/postgres  # Use rpi-1 for the DB connection
+    ports:
+      - "5432:5432"
+    volumes:
+      - patroni_data:/pgdata
+
+volumes:
+  patroni_etcd_data:
+  patroni_data:

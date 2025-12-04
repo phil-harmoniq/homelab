@@ -1,0 +1,5 @@
+[Unit]
+Description=Filebrowser Data Volume
+
+[Volume]
+VolumeName=filebrowser-data.volume

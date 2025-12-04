@@ -1,0 +1,25 @@
+[Unit]
+Description=Engagency.Data.Worker Container
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Restart=always
+TimeoutStartSec=1000
+
+[Container]
+# Container image
+ContainerName=engagency-data-worker
+Image=gitea.lab/engagency/data-worker:1
+Pull=always
+Network=devops.network
+
+# Environment variables for .NET
+Environment=DOTNET_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://+:5000
+Environment=TZ=America/New_York
+
+# Secrets
+Secret=engagency-db-password,target=EngagencyDbSettings/Password
+
+Volume=%h/Optiplex/containers/engagency/Engagency.Data.Worker.json:/app/Engagency.Data.Worker.json:z

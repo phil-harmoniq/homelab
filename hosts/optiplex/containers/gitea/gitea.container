@@ -1,0 +1,29 @@
+[Unit]
+Description=Gitea repository
+Requires=postgres.service
+After=postgres.service
+
+[Container]
+ContainerName=gitea
+Image=docker.gitea.com/gitea:1-rootless
+AutoUpdate=registry
+
+HealthCmd=curl -k http://127.0.0.1:3000
+
+Network=devops.network
+HostName=gitea
+PublishPort=3000:3000
+PublishPort=2222:2222
+
+Volume=gitea-data:/var/lib/gitea:z
+Volume=/etc/localtime:/etc/localtime:ro
+Volume=%h/Optiplex/containers/gitea/app.ini:/etc/gitea/app.ini:z
+Volume=%h/Homelab/hosts/optiplex/.certs/optiplex.lan.key:/certs/server.key:z
+Volume=%h/Homelab/hosts/optiplex/.certs/optiplex.lan.cert:/certs/server.cert:z
+
+[Service]
+Restart=always
+TimeoutStartSec=1000
+
+[Install]
+WantedBy=default.target

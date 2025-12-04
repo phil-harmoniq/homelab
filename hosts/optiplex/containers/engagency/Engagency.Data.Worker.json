@@ -1,0 +1,7 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Engagency.Data.Worker.Diagnostics": "Debug"
+    }
+  }
+}

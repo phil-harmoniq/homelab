@@ -1,0 +1,5 @@
+[Unit]
+Description=Gitea Runner 03 Volume
+
+[Volume]
+VolumeName=gitea-runner-03.volume

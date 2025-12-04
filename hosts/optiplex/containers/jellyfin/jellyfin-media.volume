@@ -1,0 +1,6 @@
+# [Unit]
+# Description=Jellyfin Media Volume
+
+# [Volume]
+# VolumeName=jellyfin-media.volume
+# HostPath=/mnt/Archive

@@ -1,0 +1,41 @@
+[Unit]
+Description=Gitea Runner Container 03
+After=network-online.target
+Requires=gitea-runner-03-volume.service
+
+[Container]
+# Image
+Image=docker.io/gitea/act_runner:latest
+ContainerName=gitea-runner-03
+Network=devops
+PodmanArgs=--security-opt label=disable
+AutoUpdate=registry
+
+HealthCmd="wget --no-check-certificate -O /dev/null https://gitea.lab"
+
+# Volumes
+Volume=%h/Optiplex/containers/gitea-runner/config.yaml:/config.yaml:z
+Volume=gitea-runner-03.volume:/data
+Volume=/run/user/1000/podman/podman.sock:/run/user/1000/podman/podman.sock:z
+
+Volume=%h/Optiplex/containers/.certs/optiplex.root.cert:/etc/containers/certs.d/gitea.lab/ca.crt:z
+Volume=%h/Optiplex/containers/.certs/optiplex.root.cert:/etc/ssl/certs/optiplex.root.crt:z
+Volume=%h/Optiplex/containers/gitea-runner/buildkitd.toml:/etc/buildkit/buildkitd.toml:z
+
+# Environment variables
+Environment=CONFIG_FILE=/config.yaml
+Environment=GITEA_INSTANCE_URL=https://gitea.lab
+Environment=GITEA_RUNNER_REGISTRATION_TOKEN=EBFVp7DteIRPDEs0Z9qMcDZGmZbzDKwk4tU3uYpY
+Environment=GITEA_RUNNER_NAME=gitea-runner
+Environment=DOCKER_HOST=unix:///run/user/1000/podman/podman.sock
+Environment=GIT_SSL_NO_VERIFY=true
+Environment=GID=1000
+Environment=UID=1000
+Environment=BUILDKITD_FLAGS=--config=/etc/buildkit/buildkitd.toml
+
+[Service]
+Restart=always
+TimeoutStartSec=1000
+
+[Install]
+WantedBy=default.target

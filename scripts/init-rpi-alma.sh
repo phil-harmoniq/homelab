@@ -53,6 +53,8 @@ install_packages()
         nfs-utils \
         pcp \
         python3-pcp \
+        wget \
+        file \
         -y
 }
 

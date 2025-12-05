@@ -1,0 +1,10 @@
+name: rpi-2
+
+etcd:
+  host: 10.0.0.169:2379
+
+restapi:
+  connect_address: 10.0.0.169:8008
+
+postgresql:
+  connect_address: 10.0.0.169:5432

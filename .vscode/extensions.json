@@ -3,6 +3,7 @@
         "timonwong.shellcheck",
         "yzhang.markdown-all-in-one",
         "hangxingliu.vscode-systemd-support",
-        "hediet.vscode-drawio"
+        "hediet.vscode-drawio",
+        "mhutchie.git-graph"
     ]
 }

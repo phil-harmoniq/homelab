@@ -1,8 +1,10 @@
-scope: pg-cluster
+scope: pgcluster
 name: rpi-1
 
-etcd:
-  host: 10.0.0.170:2379
+etcd3:
+  hosts:
+    - 10.0.0.170:2379
+    - 10.0.0.169:2379
 
 restapi:
   listen: 0.0.0.0:8008
@@ -11,22 +13,20 @@ restapi:
 postgresql:
   listen: 0.0.0.0:5432
   connect_address: 10.0.0.170:5432
-  data_dir: /var/lib/pgsql/18/data
-  bin_dir: /usr/pgsql-18/bin
-
+  data_dir: /var/lib/pgsql/data
+  bin_dir: /usr/bin
   authentication:
     superuser:
       username: postgres
-      password: postgres
+      password: your_secure_password
     replication:
       username: replicator
-      password: replicator_pw
-
+      password: replicator_password
   parameters:
     wal_level: replica
+    max_wal_senders: 8
+    max_replication_slots: 8
     hot_standby: "on"
-    max_wal_senders: 10
-    max_replication_slots: 10
 
 bootstrap:
   dcs:
@@ -36,11 +36,3 @@ bootstrap:
     maximum_lag_on_failover: 1048576
     postgresql:
       use_pg_rewind: true
-      parameters:
-        archive_mode: "on"
-        archive_command: 'cd .'
-
-tags:
-  nofailover: false
-  noloadbalance: false
-  clonefrom: false

@@ -10,6 +10,7 @@ main()
     install_packages
     enable_services
     configure_podman
+    configure_git
 }
 
 add_shell_config()
@@ -64,6 +65,12 @@ enable_services()
 configure_podman()
 {
     sudo loginctl enable-linger devops
+}
+
+configure_git()
+{
+    git config --global user.email "philhawkins.dev@gmail.com"
+    git config --global user.name "Phil Hawkins"
 }
 
 main

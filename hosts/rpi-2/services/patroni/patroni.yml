@@ -1,10 +1,38 @@
-name: rpi-2
+scope: pgcluster
+name: rpi-1
 
 etcd:
-  host: 10.0.0.169:2379
+  host:
+    - 10.0.0.170:2379
+    - 10.0.0.169:2379
 
 restapi:
+  listen: 0.0.0.0:8008
   connect_address: 10.0.0.169:8008
 
 postgresql:
+  listen: 0.0.0.0:5432
   connect_address: 10.0.0.169:5432
+  data_dir: /var/lib/pgsql/data
+  bin_dir: /usr/pgsql-16/bin
+  authentication:
+    superuser:
+      username: postgres
+      password: your_secure_password
+    replication:
+      username: replicator
+      password: replicator_password
+  parameters:
+    wal_level: replica
+    max_wal_senders: 8
+    max_replication_slots: 8
+    hot_standby: "on"
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1048576
+    postgresql:
+      use_pg_rewind: true

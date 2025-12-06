@@ -1,10 +1,12 @@
 scope: pgcluster
-name: rpi-1
+name: rpi-2
 
 etcd3:
   hosts:
     - 10.0.0.170:2379
     - 10.0.0.169:2379
+  protocol: http
+  api_version: v3
 
 restapi:
   listen: 0.0.0.0:8008
@@ -27,6 +29,24 @@ postgresql:
     max_wal_senders: 8
     max_replication_slots: 8
     hot_standby: "on"
+  pg_hba:
+    # Patroni local connections (required)
+    - local all all trust
+    - host all all 127.0.0.1/32 trust
+    - host all all ::1/128 trust
+
+    # Allow Patroni API connections from the node
+    - host all all 10.0.0.170/32 md5
+    - host all all 10.0.0.169/32 md5
+
+    # Replication between nodes
+    - host replication replicator 127.0.0.1/32 trust
+    - host replication replicator ::1/128 trust
+    - host replication replicator 10.0.0.170/32 trust
+    - host replication replicator 10.0.0.169/32 trust
+
+    # Client access (adjust as needed)
+    - host all all 10.0.0.0/24 md5
 
 bootstrap:
   dcs:
@@ -36,3 +56,7 @@ bootstrap:
     maximum_lag_on_failover: 1048576
     postgresql:
       use_pg_rewind: true
+  initdb:
+    encoding: UTF8
+    locale: en_US.UTF-8
+    locale-provider: libc

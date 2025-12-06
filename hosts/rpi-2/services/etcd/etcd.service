@@ -1,0 +1,16 @@
+[Unit]
+Description=etcd key-value store
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=etcd
+Type=notify
+EnvironmentFile=/etc/etcd/etcd.conf
+ExecStart=/usr/local/bin/etcd
+Restart=always
+RestartSec=5
+LimitNOFILE=40000
+
+[Install]
+WantedBy=multi-user.target

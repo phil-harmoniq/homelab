@@ -1,5 +1,0 @@
-[Unit]
-Description=Postgres Volume
-
-[Volume]
-VolumeName=postgres.volume

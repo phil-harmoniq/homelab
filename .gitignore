@@ -2,6 +2,7 @@
 **/.secrets/**
 **/*.secret
 **/.certs/**
+**/.certs-backup/**
 
 # Include markdown documentation
 !**/*.md

@@ -26,11 +26,11 @@ Environment="DB_POSTGRES_NAME=nginx"
 
 Volume=nginx-data:/data:z
 Volume=nginx-xerts:/etc/letsencrypt:z
-Volume=%h/Optiplex/containers/.certs:/data/custom_ssl:z
+Volume=%h/homelab/hosts/optiplex/.certs-backup:/data/custom_ssl:z
 
-[Service]
-Restart=always
-TimeoutStartSec=60
+# [Service]
+# Restart=always
+# TimeoutStartSec=60
 
 [Install]
 WantedBy=default.target

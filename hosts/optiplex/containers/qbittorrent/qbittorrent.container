@@ -1,27 +1,23 @@
 [Unit]
-ContainerName=qBittorrent
 Description=qBittorrent Container
 Wants=network-online.target
 After=network-online.target
+Requires=gluetun.service
 
 [Container]
-# Image (change tag as desired)
+ContainerName=qbittorrent
 Image=docker.io/linuxserver/qbittorrent:latest
 
-# Volumes (named volumes automatically created if they don't exist)
 Volume=qbittorrent-config:/config
-Volume=qbittorrent-downloads:/downloads
-Volume=/mnt/NAS/Archive:/Archive
+Volume=/mnt/Archive/Downloads:/downloads:z
+Volume=%h/homelab/hosts/optiplex/.certs:/Certs:z,ro
 
-# Environment
 Environment=TZ=America/New_York
-# Environment=PUID=1000
-# Environment=PGID=1000
+Environment=PUID=1000
+Environment=PGID=1000
 
-# Network
 Network=devops
 
-# Ports (host:container)
 PublishPort=8080:8080
 PublishPort=8999:8999
 PublishPort=8999:8999/udp

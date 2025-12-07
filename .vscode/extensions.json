@@ -4,6 +4,7 @@
         "yzhang.markdown-all-in-one",
         "hangxingliu.vscode-systemd-support",
         "hediet.vscode-drawio",
+        "coolbear.systemd-unit-file",
         "mhutchie.git-graph"
     ]
 }

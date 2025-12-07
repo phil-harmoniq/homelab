@@ -1,39 +1,6 @@
 [Container]
 Image=docker.io/lldap/lldap:latest-alpine-rootless
 ContainerName=lldap
-Network=devops
-
-# Expose ports
-PublishPort=6360:6360
-PublishPort=17170:17170
-
-# Persistent data
-Volume=lldap:/data
-
-# Mount TLS certificates
-Volume=%h/Optiplex/containers/.certs/optiplex.lan.key:/certs/server.key:Z
-Volume=%h/Optiplex/containers/.certs/optiplex.lan.cert:/certs/server.cert:Z
-
-Environment=LLDAP_LDAPS_OPTIONS__ENABLED=true
-Environment=LLDAP_LDAPS_OPTIONS__PORT=6360
-Environment=LLDAP_LDAPS_OPTIONS__CERT_FILE=/certs/server.cert
-Environment=LLDAP_LDAPS_OPTIONS__KEY_FILE=/certs/server.key
-Environment=LLDAP_LDAP_BASE_DN=dc=lldap,dc=lab
-
-# Secrets
-Secret=lldap-jwt-key,type=env,target=LLDAP_JWT_SECRET
-Secret=lldap-admin-password,type=env,target=LLDAP_LDAP_USER_PASS
-Secret=lldap-database-url,type=env,target=LLDAP_DATABASE_URL
-
-[Service]
-Restart=on-failure
-
-[Install]
-WantedBy=default.target
-
-[Container]
-Image=docker.io/lldap/lldap:latest-alpine-rootless
-ContainerName=lldap
 Network=host
 
 # Expose ports

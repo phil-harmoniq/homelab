@@ -1,0 +1,27 @@
+[Unit]
+Description=Nord VPN Router
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=glueten
+Image=docker.io/qmcgaw/gluetun
+AutoUpdate=registry
+
+PublishPort=8888:8888/tcp
+Network=devops
+
+AddCapability=NET_ADMIN CAP_NET_RAW
+AddDevice=/dev/net/tun
+PodmanArgs=--privileged
+
+Environment=VPN_SERVICE_PROVIDER=nordvpn
+Environment=VPN_TYPE=wireguard
+Environment=SERVER_COUNTRIES="United States"
+Environment=HTTPPROXY=on
+
+Secret=wireguard-key,type=env,target=WIREGUARD_PRIVATE_KEY
+
+[Service]
+Restart=always
+TimeoutStopSec=30

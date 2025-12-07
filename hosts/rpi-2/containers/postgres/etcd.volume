@@ -1,5 +1,0 @@
-[Unit]
-Description=Etcd Volume
-
-[Volume]
-VolumeName=etcd.volume

@@ -1,7 +1,6 @@
 [Unit]
 Description=Gitea Runner Container 03
 After=network-online.target
-Requires=gitea-runner-03-volume.service
 
 [Container]
 # Image
@@ -14,13 +13,13 @@ AutoUpdate=registry
 HealthCmd="wget --no-check-certificate -O /dev/null https://gitea.lab"
 
 # Volumes
-Volume=%h/Optiplex/containers/gitea-runner/config.yaml:/config.yaml:z
-Volume=gitea-runner-03.volume:/data
+Volume=gitea-runner-03:/data
 Volume=/run/user/1000/podman/podman.sock:/run/user/1000/podman/podman.sock:z
 
-Volume=%h/Optiplex/containers/.certs/optiplex.root.cert:/etc/containers/certs.d/gitea.lab/ca.crt:z
-Volume=%h/Optiplex/containers/.certs/optiplex.root.cert:/etc/ssl/certs/optiplex.root.crt:z
-Volume=%h/Optiplex/containers/gitea-runner/buildkitd.toml:/etc/buildkit/buildkitd.toml:z
+Volume=%h/homelab/hosts/optiplex/.certs-backup/optiplex.root.cert:/etc/containers/certs.d/gitea.lab/ca.crt:z
+Volume=%h/homelab/hosts/optiplex/.certs-backup/optiplex.root.cert:/etc/ssl/certs/optiplex.root.crt:z
+Volume=%h/homelab/hosts/optiplex/containers/gitea-runner/buildkitd.toml:/etc/buildkit/buildkitd.toml:z
+Volume=%h/homelab/hosts/optiplex/containers/gitea-runner/config.yaml:/config.yaml:z
 
 # Environment variables
 Environment=CONFIG_FILE=/config.yaml

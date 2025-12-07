@@ -18,8 +18,8 @@ PublishPort=2222:2222
 Volume=gitea-data:/var/lib/gitea:z
 Volume=/etc/localtime:/etc/localtime:ro
 Volume=%h/Optiplex/containers/gitea/app.ini:/etc/gitea/app.ini:z
-Volume=%h/Homelab/hosts/optiplex/.certs/optiplex.lan.key:/certs/server.key:z
-Volume=%h/Homelab/hosts/optiplex/.certs/optiplex.lan.cert:/certs/server.cert:z
+Volume=%h/homelab/hosts/optiplex/.certs/optiplex.lan/optiplex.lan.key:/certs/server.key:z
+Volume=%h/homelab/hosts/optiplex/.certs/optiplex.lan/optiplex.lan.cert:/certs/server.cert:z
 
 [Service]
 Restart=always

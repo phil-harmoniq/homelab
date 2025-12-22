@@ -3,6 +3,9 @@ Description=Engagency.Data.Worker Container
 After=network-online.target
 Wants=network-online.target
 
+Requires=devops.network
+After=devops.network
+
 # [Service]
 # Restart=always
 # TimeoutStartSec=1000

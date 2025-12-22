@@ -10,7 +10,7 @@ Notify=true
 
 HealthCmd="valkey-cli ping"
 
-Network=devops.network
+Network=devops
 HostName=valkey
 PublishPort=6379:6379
 

@@ -4,6 +4,10 @@ Requires=postgres.service
 After=postgres.service
 After=network-online.target
 
+# Required to resolve gitea.fivelabs.tech
+Requires=technitium.service
+After=technitium.service
+
 [Container]
 # Image
 Image=docker.io/gitea/act_runner:latest

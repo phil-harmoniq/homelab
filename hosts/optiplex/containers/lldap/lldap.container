@@ -1,3 +1,9 @@
+[Unit]
+Description=LLDAP user manager
+
+Requires=devops.network
+After=devops.network
+
 [Container]
 Image=docker.io/lldap/lldap:latest-alpine-rootless
 ContainerName=lldap

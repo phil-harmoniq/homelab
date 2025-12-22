@@ -3,6 +3,9 @@ Description=Nginx reverse proxy
 Requires=postgres.service
 After=postgres.service
 
+Requires=devops.network
+After=devops.network
+
 [Container]
 ContainerName=nginx
 Image=docker.io/jc21/nginx-proxy-manager:2

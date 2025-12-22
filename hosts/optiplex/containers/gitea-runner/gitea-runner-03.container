@@ -8,6 +8,9 @@ After=network-online.target
 Requires=technitium.service
 After=technitium.service
 
+Requires=nginx.service
+After=nginx.service
+
 [Container]
 # Image
 Image=docker.io/gitea/act_runner:latest

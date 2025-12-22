@@ -24,7 +24,7 @@ Environment=LLDAP_LDAPS_OPTIONS__ENABLED=true
 Environment=LLDAP_LDAPS_OPTIONS__PORT=6360
 Environment=LLDAP_LDAPS_OPTIONS__CERT_FILE=/certs/server.cert
 Environment=LLDAP_LDAPS_OPTIONS__KEY_FILE=/certs/server.key
-Environment=LLDAP_LDAP_BASE_DN=dc=ldap,dc=fivelabs,dc=tech
+Environment=LLDAP_LDAP_BASE_DN=dc=fivelabs,dc=tech
 
 # Secrets
 Secret=lldap-jwt-key,type=env,target=LLDAP_JWT_SECRET

@@ -24,9 +24,9 @@ Volume=%h/homelab/hosts/optiplex/containers/gitea/app.ini:/etc/gitea/app.ini:z
 Volume=%h/homelab/hosts/optiplex/.certs/fivelabs.tech/privkey.pem:/certs/server.key:z
 Volume=%h/homelab/hosts/optiplex/.certs/fivelabs.tech/fullchain.pem:/certs/server.cert:z
 
-# [Service]
-# Restart=always
-# TimeoutStartSec=1000
+[Service]
+Restart=always
+TimeoutStartSec=60
 
 [Install]
 WantedBy=default.target

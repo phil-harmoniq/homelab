@@ -3,16 +3,16 @@ Description=Engagency.Data.Worker Container
 After=network-online.target
 Wants=network-online.target
 
-[Service]
-Restart=always
-TimeoutStartSec=1000
+# [Service]
+# Restart=always
+# TimeoutStartSec=1000
 
 [Container]
 # Container image
 ContainerName=engagency-data-worker
-Image=gitea.lab/engagency/data-worker:1
+Image=gitea.fivelabs.tech/engagency/data-worker:1
 Pull=always
-Network=devops.network
+Network=devops
 
 # Environment variables for .NET
 Environment=DOTNET_ENVIRONMENT=Production

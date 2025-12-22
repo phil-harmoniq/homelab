@@ -1,0 +1,15 @@
+[Container]
+ContainerName=technitium
+Environment=DNS_SERVER_DOMAIN=technitium-optiplex
+HostName=technitium
+Image=docker.io/technitium/dns-server:14.2.0
+PublishPort=5380:5380/tcp
+PublishPort=53443:53443/tcp
+PublishPort=53:53/udp
+PublishPort=53:53/tcp
+Sysctl="net.ipv4.ip_local_port_range=1024 65535"
+Volume=technitium-data:/etc/dns
+Network=devops
+
+[Service]
+Restart=always

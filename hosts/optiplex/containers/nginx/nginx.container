@@ -10,7 +10,7 @@ AutoUpdate=registry
 
 HealthCmd="/usr/bin/check-health"
 
-Network=devops.network
+Network=devops
 HostName=nginx
 PublishPort=443:443
 PublishPort=81:81
@@ -24,9 +24,9 @@ Environment="DB_POSTGRES_USER=nginx"
 Environment="DB_POSTGRES_PASSWORD=1PmDFSAqIrJok7Z1L5fmePe1"
 Environment="DB_POSTGRES_NAME=nginx"
 
-Volume=nginx-data:/data:z
+Volume=nginx-data-2:/data:z
 Volume=nginx-xerts:/etc/letsencrypt:z
-Volume=%h/homelab/hosts/optiplex/.certs-backup:/data/custom_ssl:z
+Volume=%h/homelab/hosts/optiplex/.certs:/data/custom_ssl:z
 
 # [Service]
 # Restart=always

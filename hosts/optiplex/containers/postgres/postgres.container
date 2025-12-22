@@ -20,9 +20,9 @@ Environment=POSTGRES_PASSWORD=default_change_me
 
 Volume=postgres-data-18:/var/lib/postgresql/18/docker:Z
 
-# [Service]
-# Restart=always
-# TimeoutStartSec=1000
+[Service]
+Restart=always
+TimeoutStartSec=1000
 
 [Install]
 WantedBy=default.target

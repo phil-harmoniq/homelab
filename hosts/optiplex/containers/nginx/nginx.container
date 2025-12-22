@@ -31,9 +31,9 @@ Volume=nginx-data-2:/data:z
 Volume=nginx-xerts:/etc/letsencrypt:z
 Volume=%h/homelab/hosts/optiplex/.certs:/data/custom_ssl:z
 
-# [Service]
-# Restart=always
-# TimeoutStartSec=60
+[Service]
+Restart=always
+TimeoutStartSec=60
 
 [Install]
 WantedBy=default.target

@@ -31,8 +31,9 @@ Secret=lldap-jwt-key,type=env,target=LLDAP_JWT_SECRET
 Secret=lldap-admin-password,type=env,target=LLDAP_LDAP_USER_PASS
 Secret=lldap-database-url,type=env,target=LLDAP_DATABASE_URL
 
-# [Service]
-# Restart=on-failure
+[Service]
+Restart=always
+TimeoutStartSec=60
 
 [Install]
 WantedBy=default.target

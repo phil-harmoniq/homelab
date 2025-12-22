@@ -7,6 +7,10 @@ ContainerName=technitium
 Environment=DNS_SERVER_DOMAIN=technitium-optiplex
 HostName=technitium
 Image=docker.io/technitium/dns-server:14.2.0
+AutoUpdate=registry
+
+HealthCmd="dig @127.0.0.1 google.com"
+
 PublishPort=5380:5380/tcp
 PublishPort=53443:53443/tcp
 PublishPort=53:53/udp

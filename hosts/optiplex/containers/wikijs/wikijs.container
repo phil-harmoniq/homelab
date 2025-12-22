@@ -1,0 +1,22 @@
+[Unit]
+Description=Wiki.js documentation server
+After=network-online.target
+
+[Container]
+ContainerName=wiki
+HostName=wiki
+Image=ghcr.io/requarks/wiki:2
+PublishPort=8080:3000/tcp
+Network=devops
+
+HealthCmd=curl -k http://127.0.0.1:3000
+
+Environment=DB_TYPE=postgres
+Environment=DB_HOST=postgres
+Environment=DB_PORT=5432
+Environment=DB_USER=wiki
+Environment=DB_PASS=0dzpMtlyLaVVOKWyUYrOgQuD
+Environment=DB_NAME=wiki
+
+[Service]
+Restart=always

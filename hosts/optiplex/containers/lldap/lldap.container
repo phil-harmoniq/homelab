@@ -13,6 +13,8 @@ Network=devops
 PublishPort=636:6360
 PublishPort=17170:17170
 
+HealthCmd=/app/lldap healthcheck --config-file /data/lldap_config.toml
+
 # Persistent data
 Volume=lldap-data:/data
 

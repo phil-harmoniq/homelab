@@ -14,6 +14,8 @@ ContainerName=seq
 Image=docker.io/datalust/seq:latest
 Pull=always
 
+HealthCmd="curl http://localhost:80"
+
 # Use named volume for persistent data
 Volume=seq-data:/data:Z
 Volume=%h/homelab/hosts/optiplex/containers/seq/seq.ini:/etc/seq/seq.ini:Z
@@ -32,3 +34,10 @@ Environment=HOST_INGESTION_PORT=5341
 # Ports
 PublishPort=8900:80
 PublishPort=5341:5341
+
+[Service]
+Restart=always
+TimeoutStartSec=1000
+
+[Install]
+WantedBy=default.target

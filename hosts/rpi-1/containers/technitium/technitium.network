@@ -1,0 +1,16 @@
+[Unit]
+Description=Technitium DNS network
+After=network-online.target
+ 
+[Network]
+NetworkName=technitium
+Driver=bridge
+Subnet=10.100.1.0/24
+Gateway=10.100.1.1
+DNS=1.1.1.1
+DNS=1.0.0.1
+DNS=8.8.8.8
+DNS=8.8.4.4
+
+[Install]
+WantedBy=default.target

@@ -1,5 +1,0 @@
-[Unit]
-Description=Seq Volume
-
-[Volume]
-VolumeName=seq.volume

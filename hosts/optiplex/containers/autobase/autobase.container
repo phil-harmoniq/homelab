@@ -1,0 +1,18 @@
+[Unit]
+Description=Autobase deployment console
+
+[Container]
+ContainerName=autobase
+Image=docker.io/autobase/console:latest
+AutoUpdate=registry
+
+Network=devops
+PublishPort=5380:80
+
+Secret=autobase-token,type=env,target=PG_CONSOLE_AUTHORIZATION_TOKEN
+Environment=PG_CONSOLE_DOCKER_IMAGE=autobase/automation:latest
+
+Volume=console_postgres:/var/lib/postgresql
+Volume=/run/user/1000/podman/podman.sock:/var/run/docker.sock
+
+PodmanArgs=--privileged

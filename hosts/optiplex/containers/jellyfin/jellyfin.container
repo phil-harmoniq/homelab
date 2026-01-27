@@ -1,3 +1,9 @@
+[Unit]
+Description=Jellyfin media server
+
+Requires=devops.network
+After=devops.network
+
 [Container]
 Image=docker.io/jellyfin/jellyfin:latest
 ContainerName=jellyfin

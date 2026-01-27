@@ -1,24 +1,32 @@
+[Unit]
+Description=LLDAP user manager
+
+Requires=devops.network
+After=devops.network
+
 [Container]
 Image=docker.io/lldap/lldap:latest-alpine-rootless
 ContainerName=lldap
 Network=devops
 
 # Expose ports
-PublishPort=6360:6360
+PublishPort=636:6360
 PublishPort=17170:17170
 
+HealthCmd=/app/lldap healthcheck --config-file /data/lldap_config.toml
+
 # Persistent data
-Volume=lldap:/data
+Volume=lldap-data:/data
 
 # Mount TLS certificates
-Volume=%h/Optiplex/containers/.certs/optiplex.lan.key:/certs/server.key:Z
-Volume=%h/Optiplex/containers/.certs/optiplex.lan.cert:/certs/server.cert:Z
+Volume=%h/homelab/hosts/optiplex/containers/lldap/.certs/fivelabs.tech/privkey.pem:/certs/server.key:Z
+Volume=%h/homelab/hosts/optiplex/containers/lldap/.certs/fivelabs.tech/fullchain.pem:/certs/server.cert:Z
 
 Environment=LLDAP_LDAPS_OPTIONS__ENABLED=true
 Environment=LLDAP_LDAPS_OPTIONS__PORT=6360
 Environment=LLDAP_LDAPS_OPTIONS__CERT_FILE=/certs/server.cert
 Environment=LLDAP_LDAPS_OPTIONS__KEY_FILE=/certs/server.key
-Environment=LLDAP_LDAP_BASE_DN=dc=lldap,dc=lab
+Environment=LLDAP_LDAP_BASE_DN=dc=fivelabs,dc=tech
 
 # Secrets
 Secret=lldap-jwt-key,type=env,target=LLDAP_JWT_SECRET
@@ -26,7 +34,8 @@ Secret=lldap-admin-password,type=env,target=LLDAP_LDAP_USER_PASS
 Secret=lldap-database-url,type=env,target=LLDAP_DATABASE_URL
 
 [Service]
-Restart=on-failure
+Restart=always
+TimeoutStartSec=60
 
 [Install]
 WantedBy=default.target

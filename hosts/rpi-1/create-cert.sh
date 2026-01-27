@@ -2,10 +2,10 @@
 
 set -e
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-create_cert_script="$(realpath "$script_dir"/../../scripts/create-domain-cert.sh)"
+create_cert_script="$(realpath "$script_dir"/../../scripts/create-domain-cert-v2.sh)"
 
-domain="rpi-1"
-output_dir="$(realpath "$script_dir"/.certs)"
+hostname="rpi-1"
+output_dir="$script_dir/.certs/rpi-1.lan"
 duration="1825"
 tld="lan"
 country="US"
@@ -49,7 +49,7 @@ mkdir -p "$output_dir"
     --root-key "$root_key" \
     --root-cert "$root_cert" \
     --output-dir "$output_dir" \
-    --domain "$domain" \
+    --hostname "$hostname" \
     --tld "$tld" \
     --duration "$duration" \
     --country "$country" \

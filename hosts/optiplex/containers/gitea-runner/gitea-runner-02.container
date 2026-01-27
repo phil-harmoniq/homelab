@@ -1,6 +1,15 @@
 [Unit]
 Description=Gitea Runner Container 02
+Requires=gitea.service
+After=gitea.service
 After=network-online.target
+
+# Required to resolve gitea.fivelabs.tech
+Requires=technitium.service
+After=technitium.service
+
+Requires=nginx.service
+After=nginx.service
 
 [Container]
 # Image
@@ -10,7 +19,7 @@ Network=devops
 PodmanArgs=--security-opt label=disable
 AutoUpdate=registry
 
-HealthCmd="wget --no-check-certificate -O /dev/null https://gitea.lab"
+HealthCmd="wget --no-check-certificate -O /dev/null https://gitea.fivelabs.tech"
 
 # Volumes
 Volume=gitea-runner-02:/data
@@ -23,7 +32,7 @@ Volume=%h/homelab/hosts/optiplex/containers/gitea-runner/config.yaml:/config.yam
 
 # Environment variables
 Environment=CONFIG_FILE=/config.yaml
-Environment=GITEA_INSTANCE_URL=https://gitea.lab
+Environment=GITEA_INSTANCE_URL=https://gitea.fivelabs.tech
 Environment=GITEA_RUNNER_REGISTRATION_TOKEN=EBFVp7DteIRPDEs0Z9qMcDZGmZbzDKwk4tU3uYpY
 Environment=GITEA_RUNNER_NAME=gitea-runner
 Environment=DOCKER_HOST=unix:///run/user/1000/podman/podman.sock

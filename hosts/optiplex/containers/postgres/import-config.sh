@@ -3,8 +3,8 @@
 set -euo pipefail
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-VOLUME_NAME="postgres-data"
-DATA_FOLDER="/home/devops/.local/share/containers/storage/volumes/postgres-data/_data"
+VOLUME_NAME="postgres-data-18"
+DATA_FOLDER="/home/devops/.local/share/containers/storage/volumes/$VOLUME_NAME/_data"
 OWNER_UID=$(stat -c '%u' "$DATA_FOLDER")
 SOURCE_CONFIG="$SCRIPT_DIR/.config/postgresql.conf"
 SOURCE_HBA="$SCRIPT_DIR/.config/pg_hba.conf"

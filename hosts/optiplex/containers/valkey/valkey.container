@@ -10,7 +10,7 @@ Notify=true
 
 HealthCmd="valkey-cli ping"
 
-Network=devops.network
+Network=devops
 HostName=valkey
 PublishPort=6379:6379
 
@@ -20,9 +20,9 @@ Environment=VALKEY_TLS_KEY_FILE=/certs/valkey.lab.key
 Environment=VALKEY_TLS_CA_FILE=/certs/optiplex.root.cert
 
 Volume=valkey-data:/data:z
-Volume=%h/Optiplex/containers/.certs/valkey.lab/valkey.lab.key:/certs/valkey.lab.key:Z
-Volume=%h/Optiplex/containers/.certs/valkey.lab/valkey.lab.cert:/certs/valkey.lab.cert:Z
-Volume=%h/Optiplex/containers/.certs/optiplex.root.cert:/certs/optiplex.root.cert:Z
+Volume=%h/homelab/hosts/optiplex/.certs-backup/valkey.lab/valkey.lab.key:/certs/valkey.lab.key:Z
+Volume=%h/homelab/hosts/optiplex/.certs-backup/valkey.lab/valkey.lab.cert:/certs/valkey.lab.cert:Z
+Volume=%h/homelab/hosts/optiplex/.certs-backup/optiplex.root.cert:/certs/optiplex.root.cert:Z
 
 [Service]
 Restart=always

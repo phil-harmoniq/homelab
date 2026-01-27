@@ -1,2 +1,2 @@
-[registry."gitea.lab"]
+[registry."gitea.fivelabs.tech"]
   insecure = true

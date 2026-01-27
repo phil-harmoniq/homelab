@@ -5,7 +5,7 @@ ssl_certificate /data/custom_ssl/fivelabs.tech/fullchain.pem;
 ssl_certificate_key /data/custom_ssl/fivelabs.tech/privkey.pem;
 
 location / {
-    proxy_pass http://gitea:3000;
+    proxy_pass http://technitium:17170;
 
     # Required headers so Gitea knows the original request was HTTPS
     proxy_set_header Host $host;

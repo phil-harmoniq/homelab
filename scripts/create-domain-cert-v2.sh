@@ -33,11 +33,6 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
-    -a|--alt-names)
-      alt_names="$2"
-      shift # past argument
-      shift # past value
-      ;;
     --days)
       duration="$2"
       shift # past argument
@@ -95,16 +90,14 @@ subjectAltName         = @alt_names
 DNS.1 = $hostname
 DNS.2 = *.$hostname"
 
-if [[ -n $alt_names ]]; then
-  CLIENT_KEY="$output_dir/$hostname.$tld.key"
-  CLIENT_CERT="$output_dir/$hostname.$tld.cert"
-  CLIENT_CSR="$output_dir/$hostname.$tld.csr"
-  CLIENT_PEM="$output_dir/$hostname.$tld.pem"
+if [[ -n $tld ]]; then
   EXT_FILE="$EXT_FILE
 DNS.3 = $hostname.$tld
 DNS.4 = *.$hostname.$tld"
-EXT_FILE="DNS.5 = $hostname.woodsdr.fivelabs.tech"
 fi
+
+EXT_FILE="$EXT_FILE
+DNS.5 = $hostname.woodsdr.fivelabs.tech"
 
 [[ -n $country ]] && CLIENT_SUBJECT="$CLIENT_SUBJECT/C=$country"
 [[ -n $state ]] && CLIENT_SUBJECT="$CLIENT_SUBJECT/ST=$state"

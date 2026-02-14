@@ -1,1 +1,2 @@
-//10.1.1.2/Archive /mnt/Archive cifs credentials=/home/devops/.config/smbcredentials,uid=devops,gid=devops 0 0
+//10.1.1.2/Archive /mnt/Archive cifs credentials=/etc/samba/smbcredentials,uid=devops,gid=devops 0 0
+//10.1.1.2/Compute /mnt/Compute cifs credentials=/etc/samba/smbcredentials,uid=devops,gid=devops 0 0

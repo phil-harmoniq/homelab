@@ -1,0 +1,35 @@
+[Unit]
+Description=Engagency.Data.Api Container
+After=network-online.target
+Wants=network-online.target
+
+Requires=devops.network
+After=devops.network
+
+# [Service]
+# Restart=always
+# TimeoutStartSec=1000
+
+[Container]
+# Container image
+ContainerName=engagency-data-api
+Image=gitea.fivelabs.tech/engagency/data-api:1
+Pull=always
+Network=devops
+PublishPort=10100:10100/tcp
+
+# Environment variables for .NET
+Environment=DOTNET_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=https://+:10100
+Environment=TZ=America/New_York
+Environment=ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
+
+Volume=%h/homelab/hosts/optiplex/.certs/engagency.net/engagency.net.pfx:/https/aspnetapp.pfx:z
+
+# Run container with host UID mapped to container UID
+UserNS=keep-id
+
+# Secrets
+Secret=engagency-db-password,target=EngagencyDbSettings__Password
+
+# Volume=%h/Optiplex/containers/engagency/Engagency.Data.Api.json:/app/Engagency.Data.Api.json:z

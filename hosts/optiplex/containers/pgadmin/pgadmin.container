@@ -18,13 +18,32 @@ Environment="PGADMIN_DEFAULT_EMAIL=admin@optiplex.lan"
 Environment="PGADMIN_DEFAULT_PASSWORD=admin"
 Environment="PGADMIN_ENABLE_TLS=True"
 
+# --- LDAP Configuration ---
+Environment=PGADMIN_CONFIG_AUTHENTICATION_SOURCES="['ldap', 'internal']"
+Environment=PGADMIN_CONFIG_LDAP_AUTO_CREATE_USER=True
+
+# Root naming context
+Environment=PGADMIN_CONFIG_LDAP_SERVER_URI="\'ldaps://lldap.fivelabs.tech:636\'"
+Environment=PGADMIN_CONFIG_LDAP_BASE_DN="\"dc=fivelabs,dc=tech\""
+
+# Explicit DN construction (LLDAP-friendly)
+Environment=PGADMIN_CONFIG_LDAP_USER_DN_TEMPLATE="\"uid=%(username)s,ou=users,dc=fivelabs,dc=tech\""
+
+# Bind user (REQUIRED for LLDAP – prevents anonymous bind)
+Environment=PGADMIN_CONFIG_LDAP_BIND_USER="\"uid=ldap_bind,ou=users,dc=fivelabs,dc=tech\""
+Environment=PGADMIN_CONFIG_LDAP_BIND_PASSWORD="\"StinkyBeans2025!\""
+
+# No groups (LLDAP default)
+Environment=PGADMIN_CONFIG_LDAP_GROUP_SEARCH_BASE_DN=None
+Environment=PGADMIN_CONFIG_LDAP_GROUP_SEARCH_FILTER=None
+
 Volume=pgadmin-data:/var/lib/pgadmin:z
 Volume=%h/homelab/hosts/optiplex/.certs/optiplex.lan.key:/certs/server.key:z
 Volume=%h/homelab/hosts/optiplex/.certs/optiplex.lan.cert:/certs/server.cert:z
 
-[Service]
-Restart=always
-TimeoutStartSec=1000
+# [Service]
+# Restart=always
+# TimeoutStartSec=1000
 
 [Install]
 WantedBy=default.target

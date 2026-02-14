@@ -8,6 +8,7 @@ HostName=wiki
 Image=ghcr.io/requarks/wiki:2
 PublishPort=8080:3000/tcp
 Network=devops
+AutoUpdate=registry
 
 HealthCmd=curl -k http://127.0.0.1:3000
 

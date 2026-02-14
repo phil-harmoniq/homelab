@@ -13,6 +13,7 @@ RestartSec=5s
 ContainerName=seq
 Image=docker.io/datalust/seq:latest
 Pull=always
+AutoUpdate=registry
 
 HealthCmd="curl http://localhost:80"
 

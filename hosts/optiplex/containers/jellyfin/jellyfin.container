@@ -10,6 +10,7 @@ ContainerName=jellyfin
 Network=devops
 GroupAdd=122
 AddDevice=/dev/dri/renderD128:/dev/dri/renderD128
+AutoUpdate=registry
 
 Volume=jellyfin-config:/config:Z
 Volume=/mnt/Archive/Media:/media:z

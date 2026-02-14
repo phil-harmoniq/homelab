@@ -23,6 +23,6 @@ Environment=ASPNETCORE_URLS=http://+:5000
 Environment=TZ=America/New_York
 
 # Secrets
-Secret=engagency-db-password,target=EngagencyDbSettings/Password
+Secret=engagency-db-password,target=EngagencyDbSettings__Password
 
 Volume=%h/Optiplex/containers/engagency/Engagency.Data.Worker.json:/app/Engagency.Data.Worker.json:z

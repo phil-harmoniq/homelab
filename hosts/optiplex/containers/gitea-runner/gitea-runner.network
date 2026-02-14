@@ -1,0 +1,15 @@
+[Unit]
+Description=Gitea runner network
+After=network-online.target
+ 
+[Network]
+NetworkName=gitea-runner
+Driver=bridge
+
+Subnet=10.101.0.0/24
+Gateway=10.101.0.1
+DNS=10.1.1.11
+DNS=10.1.1.12
+
+[Install]
+WantedBy=default.target

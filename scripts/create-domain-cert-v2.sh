@@ -103,9 +103,8 @@ if [[ -n $alt_names ]]; then
   EXT_FILE="$EXT_FILE
 DNS.3 = $hostname.$tld
 DNS.4 = *.$hostname.$tld"
-fi
-
 EXT_FILE="DNS.5 = $hostname.woodsdr.fivelabs.tech"
+fi
 
 [[ -n $country ]] && CLIENT_SUBJECT="$CLIENT_SUBJECT/C=$country"
 [[ -n $state ]] && CLIENT_SUBJECT="$CLIENT_SUBJECT/ST=$state"

@@ -15,11 +15,14 @@ After=nginx.service
 # Image
 Image=docker.io/gitea/act_runner:latest
 ContainerName=gitea-runner-03
-Network=devops
+Network=gitea-runner.network
 PodmanArgs=--security-opt label=disable
 AutoUpdate=registry
 
 HealthCmd="wget --no-check-certificate -O /dev/null https://gitea.fivelabs.tech"
+
+DNS=10.1.1.11
+DNS=10.1.1.12
 
 # Volumes
 Volume=gitea-runner-03:/data

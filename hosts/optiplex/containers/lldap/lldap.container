@@ -8,6 +8,7 @@ After=devops.network
 Image=docker.io/lldap/lldap:latest-alpine-rootless
 ContainerName=lldap
 Network=devops
+AutoUpdate=registry
 
 # Expose ports
 PublishPort=636:6360

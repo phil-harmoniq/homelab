@@ -4,9 +4,8 @@ After=network-online.target
  
 [Network]
 NetworkName=core
-Driver=bridge
-Subnet=10.90.1.0/24
-Gateway=10.90.1.1
+Subnet=10.90.2.0/24
+Gateway=10.90.2.1
 DNS=10.0.0.1
  
 [Install]

@@ -4,8 +4,8 @@ set -e
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 create_cert_script="$(realpath "$script_dir"/../../scripts/create-domain-cert-v2.sh)"
 
-hostname="rpi-1"
-output_dir="$script_dir/.certs/rpi-1.lan"
+hostname="rpi-2"
+output_dir="$script_dir/.certs/rpi-2.lan"
 duration="1825"
 tld="lan"
 country="US"

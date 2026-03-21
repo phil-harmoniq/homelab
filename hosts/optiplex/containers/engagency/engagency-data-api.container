@@ -18,12 +18,15 @@ Pull=always
 Network=devops
 PublishPort=10100:10100/tcp
 
+HealthCmd="wget --no-check-certificate -qO - https://localhost:10100/v1/health"
+
 # Environment variables for .NET
 Environment=DOTNET_ENVIRONMENT=Production
 Environment=ASPNETCORE_URLS=https://+:10100
-Environment=TZ=America/New_York
+# Environment=TZ=America/New_York
 Environment=ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
 
+# Volume=/usr/share/zoneinfo:/usr/share/zoneinfo:ro
 Volume=%h/homelab/hosts/optiplex/.certs/engagency.net/engagency.net.pfx:/https/aspnetapp.pfx:z
 
 # Run container with host UID mapped to container UID

@@ -6,3 +6,6 @@
 
 # Include markdown documentation
 !**/*.md
+
+# Ignore podman directory mounts
+**/volumes/**

@@ -31,7 +31,7 @@ Environment=PGADMIN_CONFIG_LDAP_USER_DN_TEMPLATE="\"uid=%(username)s,ou=users,dc
 
 # Bind user (REQUIRED for LLDAP – prevents anonymous bind)
 Environment=PGADMIN_CONFIG_LDAP_BIND_USER="\"uid=ldap_bind,ou=users,dc=fivelabs,dc=tech\""
-Environment=PGADMIN_CONFIG_LDAP_BIND_PASSWORD="\"***REMOVED***\""
+Secret=pgadmin-ldap-bind-password,target=PGADMIN_CONFIG_LDAP_BIND_PASSWORD
 
 # No groups (LLDAP default)
 Environment=PGADMIN_CONFIG_LDAP_GROUP_SEARCH_BASE_DN=None

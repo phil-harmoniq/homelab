@@ -47,9 +47,9 @@ Environment=GID=1000
 Environment=UID=1000
 Environment=BUILDKITD_FLAGS=--config=/etc/buildkit/buildkitd.toml
 
-# [Service]
-# Restart=always
-# TimeoutStartSec=1000
+[Service]
+Restart=always
+TimeoutStartSec=1000
 
 [Install]
 WantedBy=default.target

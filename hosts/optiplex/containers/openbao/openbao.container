@@ -1,0 +1,28 @@
+[Unit]
+Description=OpenBao Secure Secret Storage
+# Requires=postgres.service
+# After=postgres.service
+
+[Container]
+ContainerName=openbao
+Image=ghcr.io/openbao/openbao:2
+AutoUpdate=registry
+
+# HealthCmd="wget -O - --no-check-certificate https://localhost:443/misc/ping"
+
+Network=devops
+HostName=openbao
+PublishPort=8200:8200
+
+Environment=BAO_DEV_ROOT_TOKEN_ID=foobar
+
+Volume=openbao-config:/openbao/config:z
+# Volume=%h/homelab/hosts/optiplex/.certs/optiplex.lan.key:/certs/server.key:z
+# Volume=%h/homelab/hosts/optiplex/.certs/optiplex.lan.cert:/certs/server.cert:z
+
+[Service]
+Restart=always
+TimeoutStartSec=1000
+
+[Install]
+WantedBy=default.target

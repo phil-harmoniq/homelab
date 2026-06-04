@@ -20,8 +20,8 @@ HealthCmd=/app/lldap healthcheck --config-file /data/lldap_config.toml
 Volume=lldap-data:/data
 
 # Mount TLS certificates
-Volume=%h/homelab/hosts/optiplex/containers/lldap/.certs/fivelabs.tech/privkey.pem:/certs/server.key:Z
-Volume=%h/homelab/hosts/optiplex/containers/lldap/.certs/fivelabs.tech/fullchain.pem:/certs/server.cert:Z
+Volume=%h/homelab/hosts/optiplex/.certs/fivelabs.tech/privkey.pem:/certs/server.key:z
+Volume=%h/homelab/hosts/optiplex/.certs/fivelabs.tech/fullchain.pem:/certs/server.cert:z
 
 Environment=LLDAP_LDAPS_OPTIONS__ENABLED=true
 Environment=LLDAP_LDAPS_OPTIONS__PORT=6360

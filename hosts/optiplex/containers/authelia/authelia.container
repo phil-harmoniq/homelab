@@ -1,32 +1,29 @@
 [Unit]
 Description=Authelia
-# Requires=postgres.service
-# After=postgres.service
 
 Requires=devops.network
 After=devops.network
 
 [Container]
+Image=docker.io/authelia/authelia:latest
 ContainerName=authelia
-Image=docker.io/kanidm/server:latest
 AutoUpdate=registry
 
-# HealthCmd="/usr/bin/check-health"
-
 Network=devops
-HostName=kanidm
-PublishPort=20443:20443
-PublishPort=20636:20636
+HostName=authelia
+
+Volume=%h/homelab/hosts/optiplex/containers/authelia/.config:/config:Z
+Volume=%h/homelab/hosts/optiplex/.certs/optiplex.root:/config/certs/lldap-ca.pem:z
+
+PublishPort=9091:9091
+
+HealthCmd=/app/healthcheck.sh
 
 Environment=TZ=America/New_York
 
-# Volume=kanidm-data:/data:z
-Volume=%h/homelab/hosts/optiplex/containers/kanidm/server.toml:/data/server.toml:z
-Volume=%h/homelab/hosts/optiplex/.certs/fivelabs.tech:/ssl:z
-
-# [Service]
-# Restart=always
-# TimeoutStartSec=60
+[Service]
+Restart=always
+TimeoutStartSec=60
 
 [Install]
 WantedBy=default.target

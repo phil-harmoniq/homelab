@@ -15,4 +15,4 @@ set -euo pipefail
 
 # podman run -d --name nextcloud-db --pod nextcloud-pod -e MYSQL_ROOT_PASSWORD=your_root_password -e MYSQL_PASSWORD=nextcloud_password -e MYSQL_DATABASE=nextcloud -e MYSQL_USER=nextcloud -v $HOME/homelab/hosts/optiplex/containers/nextcloud/volumes/db:/var/lib/mysql:Z docker.io/mariadb:latest
 
-podman run -d --name nextcloud --network devops -p 18080:80 -p 18443:443 -v nextcloud:/var/www/html:Z docker.io/nextcloud:latest
+podman run -d --rm --name nextcloud --network devops -p 18080:80 -p 18443:443 -v nextcloud:/var/www/html:Z docker.io/nextcloud:latest

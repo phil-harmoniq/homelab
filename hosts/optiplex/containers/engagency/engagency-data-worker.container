@@ -5,6 +5,8 @@ Wants=network-online.target
 
 Requires=devops.network
 After=devops.network
+Requires=postgres.service
+After=postgres.service
 
 # [Service]
 # Restart=always
@@ -16,13 +18,26 @@ ContainerName=engagency-data-worker
 Image=gitea.fivelabs.tech/engagency/data-worker:1
 Pull=always
 Network=devops
+PublishPort=10101:10101/tcp
+
+HealthCmd="wget --no-check-certificate -qO - https://localhost:10101/health"
 
 # Environment variables for .NET
-Environment=DOTNET_ENVIRONMENT=Production
-Environment=ASPNETCORE_URLS=http://+:5000
-Environment=TZ=America/New_York
+Environment=DOTNET_ENVIRONMENT=Staging
+Environment=ASPNETCORE_URLS=https://+:10101
+Environment=ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
+
+# Match host timezone automatically
+Volume=/etc/localtime:/etc/localtime:ro
+Volume=/usr/share/zoneinfo:/usr/share/zoneinfo:ro
+Volume=%h/homelab/hosts/optiplex/.certs/engagency.net/engagency.net.pfx:/https/aspnetapp.pfx:z
+
+# Run container with host UID mapped to container UID
+UserNS=keep-id
 
 # Secrets
 Secret=engagency-db-password,target=EngagencyDbSettings__Password
+Secret=engagency-db-password,target=HangfireDbSettings__Password
+Secret=engagency-hangfire-password,target=HangfireDashboardSettings__Password
 
 Volume=%h/Optiplex/containers/engagency/Engagency.Data.Worker.json:/app/Engagency.Data.Worker.json:z

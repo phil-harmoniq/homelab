@@ -17,14 +17,15 @@ TimeoutStartSec=1000
 ContainerName=engagency-data-worker
 Image=gitea.fivelabs.tech/engagency/data-worker:1
 Pull=always
+AutoUpdate=registry
 Network=devops
 PublishPort=10101:10101/tcp
 
-# Hard memory ceiling. .NET reads the cgroup limit and caps its GC heap to ~75% of it,
-# so the GC collects under pressure instead of letting the heap climb until the host OOM-kills it.
-# --memory-swap equal to Memory disables swap, giving a fast, predictable kill instead of thrashing.
-Memory=768m
-PodmanArgs=--memory-swap=768m
+# # Hard memory ceiling. .NET reads the cgroup limit and caps its GC heap to ~75% of it,
+# # so the GC collects under pressure instead of letting the heap climb until the host OOM-kills it.
+# # --memory-swap equal to Memory disables swap, giving a fast, predictable kill instead of thrashing.
+# Memory=768m
+# PodmanArgs=--memory-swap=768m
 
 HealthCmd="wget --no-check-certificate -qO - https://localhost:10101/health"
 

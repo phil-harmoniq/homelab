@@ -17,14 +17,15 @@ TimeoutStartSec=1000
 ContainerName=engagency-data-api
 Image=gitea.fivelabs.tech/engagency/data-api:1
 Pull=always
+AutoUpdate=registry
 Network=devops
 PublishPort=10100:10100/tcp
 
-# Hard memory ceiling. .NET reads the cgroup limit and caps its GC heap to ~75% of it,
-# so a runaway becomes a fast, container-scoped kill instead of a host-wide OOM-killer event.
-# --memory-swap equal to Memory disables swap, giving a fast, predictable kill instead of thrashing.
-Memory=512m
-PodmanArgs=--memory-swap=512m
+# # Hard memory ceiling. .NET reads the cgroup limit and caps its GC heap to ~75% of it,
+# # so a runaway becomes a fast, container-scoped kill instead of a host-wide OOM-killer event.
+# # --memory-swap equal to Memory disables swap, giving a fast, predictable kill instead of thrashing.
+# Memory=512m
+# PodmanArgs=--memory-swap=512m
 
 HealthCmd="wget --no-check-certificate -qO - https://localhost:10100/v1/health"
 

@@ -9,3 +9,19 @@
 
 # Ignore podman directory mounts
 **/volumes/**
+
+# Credentials — never commit
+talosconfig
+kubeconfig
+secrets.yaml
+*.secret.yaml
+
+# Rendered Talos machine configs (contain embedded secrets)
+# Comment these out if you accept committing them to a PRIVATE repo
+controlplane.yaml
+controlplane-rpi-*.yaml
+worker.yaml
+
+# Large / regenerable artifacts
+metal-arm64.raw
+*.raw

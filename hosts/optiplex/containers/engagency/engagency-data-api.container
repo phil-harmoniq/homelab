@@ -37,7 +37,7 @@ Environment=ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
 # Workstation GC: env var overrides the build's <ServerGarbageCollection>true</>.
 # Server GC sees all host cores in rootless podman and commits one heap+thread per core —
 # unnecessary footprint for a light, bounded-query API.
-Environment=DOTNET_gcServer=0
+# Environment=DOTNET_gcServer=0
 
 # Match host timezone automatically
 Volume=/etc/localtime:/etc/localtime:ro

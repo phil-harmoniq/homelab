@@ -4,6 +4,7 @@ metadata:
   name: pg
   namespace: default
 spec:
+  enableSuperuserAccess: true
   instances: 3
 
   storage:

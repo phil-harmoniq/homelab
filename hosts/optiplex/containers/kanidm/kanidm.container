@@ -1,0 +1,32 @@
+[Unit]
+Description=Kanidm Identity Management Platform
+# Requires=postgres.service
+# After=postgres.service
+
+Requires=devops.network
+After=devops.network
+
+[Container]
+ContainerName=kanidm
+Image=docker.io/kanidm/server:latest
+AutoUpdate=registry
+
+# HealthCmd="/usr/bin/check-health"
+
+Network=devops
+HostName=kanidm
+PublishPort=20443:20443
+PublishPort=20636:20636
+
+Environment=TZ=America/New_York
+
+# Volume=kanidm-data:/data:z
+Volume=%h/homelab/hosts/optiplex/containers/kanidm/server.toml:/data/server.toml:z
+Volume=%h/homelab/hosts/optiplex/.certs/fivelabs.tech:/ssl:z
+
+# [Service]
+# Restart=always
+# TimeoutStartSec=60
+
+[Install]
+WantedBy=default.target

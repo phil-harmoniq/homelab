@@ -1,5 +1,0 @@
-[Unit]
-Description=Authelia Volume
-
-[Volume]
-VolumeName=authelia.volume

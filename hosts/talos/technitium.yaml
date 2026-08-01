@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: technitium
+  namespace: technitium
+spec:
+  selector:
+    matchLabels: { app: technitium }
+  template:
+    metadata:
+      labels: { app: technitium }
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: technitium
+          image: technitium/dns-server:15.4.0   # pin a version tag for repeatability
+          env:
+            - name: NODE_NAME
+              valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+            - name: HOST_IP
+              valueFrom: { fieldRef: { fieldPath: status.hostIP } }
+            - name: DNS_SERVER_DOMAIN
+              value: "$(NODE_NAME)"                       # unique cluster identity per node
+            - name: DNS_SERVER_ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: technitium-admin, key: password } }
+            - name: DNS_SERVER_WEB_SERVICE_HTTP_PORT
+              value: "5380"
+            # Bind web console + DNS to the NODE IP, not 0.0.0.0, to avoid Talos host DNS on 127.0.0.53
+            - name: DNS_SERVER_WEB_SERVICE_LOCAL_ADDRESSES
+              value: "$(HOST_IP)"
+            - name: DNS_SERVER_LOCAL_ADDRESSES            # verify this env name (see note below)
+              value: "$(HOST_IP)"
+          volumeMounts:
+            - { name: config, mountPath: /etc/dns }
+      volumes:
+        - name: config
+          hostPath:
+            path: /var/lib/technitium                    # node-local config; /var is writable on Talos
+            type: DirectoryOrCreate

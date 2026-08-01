@@ -5,25 +5,43 @@ Wants=network-online.target
 
 Requires=devops.network
 After=devops.network
+Requires=postgres.service
+After=postgres.service
 
-# [Service]
-# Restart=always
-# TimeoutStartSec=1000
+[Service]
+Restart=always
+TimeoutStartSec=1000
 
 [Container]
 # Container image
 ContainerName=engagency-data-api
 Image=gitea.fivelabs.tech/engagency/data-api:1
 Pull=always
+AutoUpdate=registry
 Network=devops
 PublishPort=10100:10100/tcp
 
+# # Hard memory ceiling. .NET reads the cgroup limit and caps its GC heap to ~75% of it,
+# # so a runaway becomes a fast, container-scoped kill instead of a host-wide OOM-killer event.
+# # --memory-swap equal to Memory disables swap, giving a fast, predictable kill instead of thrashing.
+# Memory=512m
+# PodmanArgs=--memory-swap=512m
+
+HealthCmd="wget --no-check-certificate -qO - https://localhost:10100/v1/health"
+
 # Environment variables for .NET
-Environment=DOTNET_ENVIRONMENT=Production
+Environment=DOTNET_ENVIRONMENT=Staging
 Environment=ASPNETCORE_URLS=https://+:10100
 Environment=TZ=America/New_York
 Environment=ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
+# Workstation GC: env var overrides the build's <ServerGarbageCollection>true</>.
+# Server GC sees all host cores in rootless podman and commits one heap+thread per core —
+# unnecessary footprint for a light, bounded-query API.
+Environment=DOTNET_gcServer=0
 
+# Match host timezone automatically
+Volume=/etc/localtime:/etc/localtime:ro
+Volume=/usr/share/zoneinfo:/usr/share/zoneinfo:ro
 Volume=%h/homelab/hosts/optiplex/.certs/engagency.net/engagency.net.pfx:/https/aspnetapp.pfx:z
 
 # Run container with host UID mapped to container UID

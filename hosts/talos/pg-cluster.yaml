@@ -1,0 +1,31 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg
+  namespace: default
+spec:
+  instances: 3
+
+  storage:
+    storageClass: local-path
+    size: 5Gi
+
+  # Spread the 3 instances across your 3 nodes (one each)
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: required
+
+  # Modest resources so three Postgres instances are comfortable on Pi 4s
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+
+  # Sane defaults for a small cluster
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "128MB"

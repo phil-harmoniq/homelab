@@ -30,3 +30,11 @@ spec:
     parameters:
       max_connections: "100"
       shared_buffers: "128MB"
+
+  managed:
+    roles:
+      - name: lldap
+        ensure: present
+        login: true
+        passwordSecret:
+          name: lldap-db-app

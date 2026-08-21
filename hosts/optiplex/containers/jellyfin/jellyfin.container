@@ -5,7 +5,7 @@ Requires=devops.network
 After=devops.network
 
 [Container]
-Image=docker.io/jellyfin/jellyfin:latest
+Image=docker.io/jellyfin/jellyfin:10
 ContainerName=jellyfin
 Network=devops
 GroupAdd=122

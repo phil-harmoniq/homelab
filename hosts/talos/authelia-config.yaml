@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-config
+  namespace: auth
+data:
+  configuration.yml: |
+    theme: 'dark'
+
+    server:
+      address: 'tcp://0.0.0.0:9091'
+
+    log:
+      level: 'info'
+
+    authentication_backend:
+      ldap:
+        implementation: 'lldap'
+        address: 'ldap://lldap.auth.svc.cluster.local:3890'
+        base_dn: 'dc=fivelabs,dc=tech'
+        user: 'uid=authelia,ou=people,dc=fivelabs,dc=tech'
+
+    access_control:
+      default_policy: 'deny'
+      rules:
+        - domain: 'auth.fivelabs.tech'
+          policy: 'bypass'
+        - domain: '*.fivelabs.tech'
+          policy: 'one_factor'
+
+    session:
+      name: 'authelia_session'
+      same_site: 'lax'
+      inactivity: '5m'
+      expiration: '1h'
+      remember_me: '1M'
+      cookies:
+        - domain: 'fivelabs.tech'
+          authelia_url: 'https://auth.fivelabs.tech'
+      redis:
+        host: 'valkey.auth.svc.cluster.local'
+        port: 6379
+
+    storage:
+      postgres:
+        address: 'tcp://pg-rw.default.svc.cluster.local:5432'
+        database: 'authelia'
+        username: 'authelia'
+
+    notifier:
+      filesystem:
+        filename: '/config/notification.txt'

@@ -12,29 +12,60 @@ spec:
     spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      initContainers:
+        - name: configurator
+          image: curlimages/curl:latest       # pin to a specific tag for reproducibility
+          restartPolicy: Always
+          env:
+            - name: NODE_IP
+              valueFrom: { fieldRef: { fieldPath: status.hostIP } }
+            - name: ADMIN_PASSWORD
+              valueFrom: { secretKeyRef: { name: technitium-admin, key: password } }
+          command:
+            - sh
+            - -c
+            - |
+              API="https://${NODE_IP}:53443"
+              echo "configurator: waiting for Technitium API at ${API}"
+              TOKEN=""; i=0
+              while [ -z "$TOKEN" ] && [ "$i" -lt 60 ]; do
+                TOKEN=$(curl -sk "${API}/api/user/login" \
+                  --data-urlencode "user=admin" \
+                  --data-urlencode "pass=${ADMIN_PASSWORD}" \
+                  | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+                [ -z "$TOKEN" ] && { sleep 3; i=$((i+1)); }
+              done
+              if [ -z "$TOKEN" ]; then echo "configurator: login failed, giving up"; else
+                echo "configurator: logged in; applying settings"
+                curl -sk -H "Authorization: Bearer ${TOKEN}" \
+                  "${API}/api/settings/set?dnsServerLocalEndPoints=${NODE_IP}:53" >/dev/null \
+                  && echo "configurator: DNS local endpoint set to ${NODE_IP}:53"
+                curl -sk -H "Authorization: Bearer ${TOKEN}" \
+                  "${API}/api/settings/set?webServiceLocalAddresses=${NODE_IP}&webServiceEnableHttps=true&webServiceHttpsPort=53443" >/dev/null \
+                  && echo "configurator: HTTPS settings applied"
+              fi
+              echo "configurator: done; idling"
+              while true; do sleep 3600; done
       containers:
         - name: technitium
-          image: technitium/dns-server:15.4.0   # pin a version tag for repeatability
+          image: technitium/dns-server:15.4.0
           env:
             - name: NODE_NAME
               valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
             - name: HOST_IP
               valueFrom: { fieldRef: { fieldPath: status.hostIP } }
             - name: DNS_SERVER_DOMAIN
-              value: "$(NODE_NAME)"                       # unique cluster identity per node
+              value: "$(NODE_NAME)"
             - name: DNS_SERVER_ADMIN_PASSWORD
               valueFrom: { secretKeyRef: { name: technitium-admin, key: password } }
             - name: DNS_SERVER_WEB_SERVICE_HTTP_PORT
               value: "5380"
-            # Bind web console + DNS to the NODE IP, not 0.0.0.0, to avoid Talos host DNS on 127.0.0.53
             - name: DNS_SERVER_WEB_SERVICE_LOCAL_ADDRESSES
-              value: "$(HOST_IP)"
-            - name: DNS_SERVER_LOCAL_ADDRESSES            # verify this env name (see note below)
               value: "$(HOST_IP)"
           volumeMounts:
             - { name: config, mountPath: /etc/dns }
       volumes:
         - name: config
           hostPath:
-            path: /var/lib/technitium                    # node-local config; /var is writable on Talos
+            path: /var/lib/technitium
             type: DirectoryOrCreate

@@ -38,3 +38,8 @@ spec:
         login: true
         passwordSecret:
           name: lldap-db-app
+      - name: authelia
+        ensure: present
+        login: true
+        passwordSecret:
+          name: authelia-db-app

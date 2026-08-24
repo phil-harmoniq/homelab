@@ -46,6 +46,10 @@ spec:
               value: /secrets/session-redis-password
             - name: AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD_FILE
               value: /secrets/ldap-password
+            - name: X_AUTHELIA_CONFIG_FILTERS
+              value: template
+            - name: AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET_FILE
+              value: /secrets/oidc-hmac-secret
           ports:
             - { name: http, containerPort: 9091 }
           volumeMounts:

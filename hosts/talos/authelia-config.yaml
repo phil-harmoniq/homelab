@@ -50,3 +50,22 @@ data:
     notifier:
       filesystem:
         filename: '/config/notification.txt'
+
+    identity_providers:
+      oidc:
+        jwks:
+          - key: {{ secret "/secrets/oidc-issuer-key" | mindent 10 "|" | msquote }}
+        clients:
+          - client_id: 'gitea'
+            client_name: 'Gitea'
+            client_secret: '$pbkdf2-sha512$310000$EClfihCe1l10HB6fLbU5Pg$ccnWNFWAorCBiE.O8RFXThZbN6GKysnORroRlrT88VDyP7yTiFN1YBmUrsvegJe4COIjzRwDQi3RR.hAtEexfA'
+            public: false
+            authorization_policy: 'one_factor'
+            redirect_uris:
+              - 'https://gitea.fivelabs.tech/user/oauth2/authelia/callback'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            userinfo_signed_response_alg: 'none'

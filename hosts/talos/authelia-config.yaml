@@ -60,6 +60,7 @@ data:
             client_name: 'Gitea'
             client_secret: '$pbkdf2-sha512$310000$EClfihCe1l10HB6fLbU5Pg$ccnWNFWAorCBiE.O8RFXThZbN6GKysnORroRlrT88VDyP7yTiFN1YBmUrsvegJe4COIjzRwDQi3RR.hAtEexfA'
             public: false
+            consent_mode: 'implicit'
             authorization_policy: 'one_factor'
             redirect_uris:
               - 'https://gitea.fivelabs.tech/user/oauth2/authelia/callback'
@@ -68,4 +69,22 @@ data:
               - 'profile'
               - 'email'
               - 'groups'
+            userinfo_signed_response_alg: 'none'
+          - client_id: 'pgadmin'
+            client_name: 'pgAdmin'
+            client_secret: '$pbkdf2-sha512$310000$SpPa7qvc9.Z4VzvsuTgoUQ$sz2l/SjmmF.TCDWAGu7inWNzlxJT6FtEvefiygVysCpiEYIoezKcCoGHFH21SHx9N4B4xRGDzPvwK9H55iUJYw'
+            public: false
+            consent_mode: 'implicit'
+            authorization_policy: 'one_factor'
+            redirect_uris:
+              - 'https://pgadmin.fivelabs.tech/oauth2/authorize'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+            response_types:
+              - 'code'
+            grant_types:
+              - 'authorization_code'
+            token_endpoint_auth_method: 'client_secret_basic'
             userinfo_signed_response_alg: 'none'

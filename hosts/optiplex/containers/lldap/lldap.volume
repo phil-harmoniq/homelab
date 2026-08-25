@@ -1,5 +1,0 @@
-[Unit]
-Description=LLDAP Volume
-
-[Volume]
-VolumeName=lldap.volume

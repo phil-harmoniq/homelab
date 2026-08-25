@@ -7,7 +7,9 @@ ContainerName=technitium
 Environment=DNS_SERVER_DOMAIN=optiplex.dns
 HostName=optiplex.dns
 Image=docker.io/technitium/dns-server:15.4.0
-Network=host
+Network=devops
+PublishPort=53:53
+PublishPort=53443:53443
 
 HealthCmd="dig @127.0.0.1 google.com"
 

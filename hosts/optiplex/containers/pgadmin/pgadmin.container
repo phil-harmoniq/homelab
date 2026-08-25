@@ -14,31 +14,31 @@ Network=devops.network
 HostName=pgadmin
 PublishPort=8443:443
 
-Environment="PGADMIN_DEFAULT_EMAIL=admin@optiplex.lan"
-Environment="PGADMIN_DEFAULT_PASSWORD=admin"
-Environment="PGADMIN_ENABLE_TLS=True"
+# Environment="PGADMIN_DEFAULT_EMAIL=admin@optiplex.lan"
+# Environment="PGADMIN_DEFAULT_PASSWORD=admin"
+# Environment="PGADMIN_ENABLE_TLS=True"
 
-# --- LDAP Configuration ---
-Environment=PGADMIN_CONFIG_AUTHENTICATION_SOURCES="['ldap', 'internal']"
-Environment=PGADMIN_CONFIG_LDAP_AUTO_CREATE_USER=True
+# # --- LDAP Configuration ---
+# Environment=PGADMIN_CONFIG_AUTHENTICATION_SOURCES="['ldap', 'internal']"
+# Environment=PGADMIN_CONFIG_LDAP_AUTO_CREATE_USER=True
 
-# Root naming context
-Environment=PGADMIN_CONFIG_LDAP_SERVER_URI="\'ldaps://lldap.fivelabs.tech:636\'"
-Environment=PGADMIN_CONFIG_LDAP_BASE_DN="\"dc=fivelabs,dc=tech\""
+# # Root naming context
+# Environment=PGADMIN_CONFIG_LDAP_SERVER_URI="\'ldaps://lldap.fivelabs.tech:636\'"
+# Environment=PGADMIN_CONFIG_LDAP_BASE_DN="\"dc=fivelabs,dc=tech\""
 
-# Explicit DN construction (LLDAP-friendly)
-Environment=PGADMIN_CONFIG_LDAP_USER_DN_TEMPLATE="\"uid=%(username)s,ou=people,dc=fivelabs,dc=tech\""
+# # Explicit DN construction (LLDAP-friendly)
+# Environment=PGADMIN_CONFIG_LDAP_USER_DN_TEMPLATE="\"uid=%(username)s,ou=people,dc=fivelabs,dc=tech\""
 
-# Bind user (REQUIRED for LLDAP – prevents anonymous bind)
-Environment=PGADMIN_CONFIG_LDAP_BIND_USER="\"uid=ldap_bind,ou=people,dc=fivelabs,dc=tech\""
-Secret=pgadmin-ldap-bind-password,target=PGADMIN_CONFIG_LDAP_BIND_PASSWORD
+# # Bind user (REQUIRED for LLDAP – prevents anonymous bind)
+# Environment=PGADMIN_CONFIG_LDAP_BIND_USER="\"uid=ldap_bind,ou=people,dc=fivelabs,dc=tech\""
+# Secret=pgadmin-ldap-bind-password,target=PGADMIN_CONFIG_LDAP_BIND_PASSWORD
 
-# No groups (LLDAP default)
-Environment=PGADMIN_CONFIG_LDAP_GROUP_SEARCH_BASE_DN=None
-Environment=PGADMIN_CONFIG_LDAP_GROUP_SEARCH_FILTER=None
+# # No groups (LLDAP default)
+# Environment=PGADMIN_CONFIG_LDAP_GROUP_SEARCH_BASE_DN=None
+# Environment=PGADMIN_CONFIG_LDAP_GROUP_SEARCH_FILTER=None
 
-Environment=PGADMIN_CONFIG_LDAP_USE_SSL=True
-Environment=PGADMIN_CONFIG_LDAP_TLS_REQUIRE_CERT=False
+# Environment=PGADMIN_CONFIG_LDAP_USE_SSL=True
+# Environment=PGADMIN_CONFIG_LDAP_TLS_REQUIRE_CERT=False
 
 Volume=pgadmin-data:/var/lib/pgadmin:z
 Volume=%h/homelab/hosts/optiplex/.certs/optiplex.lan.key:/certs/server.key:z

@@ -15,7 +15,7 @@ spec:
         fsGroup: 10001
       containers:
         - name: lldap
-          image: lldap/lldap:stable      # pin a version tag for repeatability
+          image: lldap/lldap:stable
           securityContext:
             capabilities:
               drop: ["ALL"]
@@ -34,14 +34,28 @@ spec:
               valueFrom: { secretKeyRef: { name: lldap-secrets, key: ldap-user-pass } }
             - name: LLDAP_DATABASE_URL
               valueFrom: { secretKeyRef: { name: lldap-secrets, key: database-url } }
+            # --- LDAPS ---
+            - name: LLDAP_LDAPS_OPTIONS__ENABLED
+              value: "true"
+            - name: LLDAP_LDAPS_OPTIONS__PORT
+              value: "6360"
+            - name: LLDAP_LDAPS_OPTIONS__CERT_FILE
+              value: "/certs/tls.crt"
+            - name: LLDAP_LDAPS_OPTIONS__KEY_FILE
+              value: "/certs/tls.key"
           ports:
             - { name: ldap, containerPort: 3890 }
+            - { name: ldaps, containerPort: 6360 }
             - { name: http, containerPort: 17170 }
           volumeMounts:
             - { name: data, mountPath: /data }
+            - { name: certs, mountPath: /certs, readOnly: true }
       volumes:
         - name: data
           emptyDir: {}
+        - name: certs
+          secret:
+            secretName: fivelabs-wildcard-tls
 ---
 apiVersion: v1
 kind: Service
@@ -53,6 +67,21 @@ spec:
   ports:
     - { name: ldap, port: 3890, targetPort: 3890 }
     - { name: http, port: 17170, targetPort: 17170 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lldap-ldaps-lb
+  namespace: auth
+  annotations:
+    lbipam.cilium.io/ips: "10.1.1.201"
+spec:
+  type: LoadBalancer
+  selector: { app: lldap }
+  ports:
+    - name: ldaps
+      port: 636          # standard LDAPS port, exposed on the LAN
+      targetPort: 6360   # LLDAP's actual listener
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

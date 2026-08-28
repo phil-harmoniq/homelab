@@ -7,6 +7,9 @@ Requires=gluetun.service
 [Container]
 ContainerName=qbittorrent
 Image=docker.io/linuxserver/qbittorrent:latest
+AutoUpdate=registry
+
+HealthCmd=curl http://127.0.0.1:8080
 
 Volume=qbittorrent-config:/config
 Volume=/mnt/Archive/Downloads:/downloads:z

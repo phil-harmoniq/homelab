@@ -31,6 +31,7 @@ services authenticate against.
   - [Namespaces](#namespaces)
   - [Secrets \& things you must not lose](#secrets--things-you-must-not-lose)
   - [Operational gotchas (hard-won lessons)](#operational-gotchas-hard-won-lessons)
+  - [Updating components](#updating-components)
   - [Repository layout (manifests)](#repository-layout-manifests)
 
 ---
@@ -325,6 +326,42 @@ Back these up somewhere durable and offline.
   recreate to force a clean roll when in doubt.
 - **`kubectl logs deploy/x`** grabs only one pod; use `-l <selector> --prefix` to see all replicas
   during a rollout.
+
+---
+
+## Updating components
+
+Nothing here auto-updates. Every workload uses a **pinned image tag** (never `:latest`), so
+updates are explicit and rollbacks are trivial. The mechanism differs by how each thing was
+deployed:
+
+| Component | How it was deployed | How to update |
+|---|---|---|
+| CloudNativePG **operator** | Helm | `helm repo update && helm upgrade cnpg cnpg/cloudnative-pg -n cnpg-system` |
+| **PostgreSQL version** (the database) | CNPG `Cluster` resource | Edit `imageName` in `pg-cluster.yaml`, apply — CNPG does a rolling update (replicas first, then a switchover) |
+| cert-manager | Helm | `helm upgrade cert-manager jetstack/cert-manager -n cert-manager` (preserve custom `extraArgs` — see TLS note) |
+| kube-prometheus-stack | Helm | `helm repo update && helm upgrade prometheus prometheus-community/kube-prometheus-stack -n monitoring` |
+| Technitium, LLDAP, Authelia, Valkey | plain Deployment / DaemonSet | Edit the image tag in the manifest, `kubectl apply`, watch `kubectl rollout status` |
+
+**Safe update pattern for stateful components:**
+
+1. **Read the release notes** — especially for major version bumps (breaking changes, migrations).
+2. **Back up first** — CNPG backup for Postgres; Settings → Backup export for Technitium.
+3. **Bump the pinned tag** in the manifest (keep it explicit).
+4. **Apply and watch the rollout** (`kubectl rollout status`, check logs).
+5. **Verify**, and roll back if needed (`kubectl rollout undo`, re-apply the old tag, or restore a backup).
+6. **Commit** the version bump so the repo matches reality.
+
+**Notes:**
+
+- **Postgres minor** bumps (18.1 → 18.2) are safe rolling updates. **Major** bumps (18 → 19)
+  involve a real migration — read the CNPG release notes first.
+- **Technitium is a cluster** — keep the primary (optiplex quadlet) and the k8s secondaries on
+  **matching versions**; update them together to avoid version skew.
+- Finding new versions is manual (Docker Hub / GitHub releases, or `helm search repo <chart>
+  --versions`). Tools like [Renovate](https://github.com/renovatebot/renovate) or
+  [Diun](https://crazymax.dev/diun/) can watch for new tags and notify — optional for a homelab
+  this size.
 
 ---
 

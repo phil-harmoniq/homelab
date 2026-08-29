@@ -6,30 +6,31 @@ metadata:
 spec:
   enableSuperuserAccess: true
   instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie
 
   storage:
     storageClass: local-path
-    size: 5Gi
+    size: 32Gi
 
-  # Spread the 3 instances across your 3 nodes (one each)
   affinity:
     enablePodAntiAffinity: true
     topologyKey: kubernetes.io/hostname
     podAntiAffinityType: required
 
-  # Modest resources so three Postgres instances are comfortable on Pi 4s
   resources:
     requests:
-      memory: "512Mi"
-      cpu: "250m"
-    limits:
       memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
 
-  # Sane defaults for a small cluster
   postgresql:
     parameters:
       max_connections: "100"
-      shared_buffers: "128MB"
+      shared_buffers: "512MB"
+      effective_cache_size: "1GB"
+      maintenance_work_mem: "128MB"
+      work_mem: "8MB"
 
   managed:
     roles:

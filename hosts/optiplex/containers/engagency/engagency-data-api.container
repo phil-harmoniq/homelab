@@ -51,3 +51,6 @@ UserNS=keep-id
 Secret=engagency-db-password,target=EngagencyDbSettings__Password
 
 # Volume=%h/Optiplex/containers/engagency/Engagency.Data.Api.json:/app/Engagency.Data.Api.json:z
+
+[Install]
+WantedBy=default.target

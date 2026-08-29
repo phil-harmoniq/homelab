@@ -1,27 +1,33 @@
-[Unit]
-Description=Nord VPN Router
-Wants=network-online.target
-After=network-online.target
-
 [Container]
 ContainerName=gluetun
-Image=docker.io/qmcgaw/gluetun
-AutoUpdate=registry
+Image=docker.io/qmcgaw/gluetun:latest
 
-PublishPort=8888:8888/tcp
-Network=devops
-
-AddCapability=NET_ADMIN CAP_NET_RAW
-AddDevice=/dev/net/tun
-PodmanArgs=--privileged
+AddCapability=NET_ADMIN
+AddCapability=NET_RAW
+AddDevice=/dev/net/tun:/dev/net/tun
 
 Environment=VPN_SERVICE_PROVIDER=nordvpn
 Environment=VPN_TYPE=wireguard
 Environment=SERVER_COUNTRIES="United States"
-Environment=HTTPPROXY=on
+Environment=TZ=America/New_York
+Environment=FIREWALL_OUTBOUND_SUBNETS=10.1.1.0/24,10.1.2.0/24
+Secret=wg_private_key,type=env,target=WIREGUARD_PRIVATE_KEY
 
-Secret=wireguard-key,type=env,target=WIREGUARD_PRIVATE_KEY
+Volume=gluetun-config:/gluetun
+Network=pasta:-i,enp0s31f6,-a,10.0.2.0,-n,24,-g,10.0.2.2,--dns-forward,10.0.2.3,-4
+
+PublishPort=8080:8080
+
+HealthCmd=/gluetun-entrypoint healthcheck
+HealthInterval=10s
+HealthTimeout=5s
+HealthStartPeriod=20s
+HealthRetries=3
 
 [Service]
 Restart=always
 TimeoutStopSec=30
+Notify=healthy
+
+[Install]
+WantedBy=default.target

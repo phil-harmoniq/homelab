@@ -49,3 +49,6 @@ Secret=engagency-db-password,target=HangfireDbSettings__Password
 Secret=engagency-hangfire-password,target=HangfireDashboardSettings__Password
 
 Volume=%h/Optiplex/containers/engagency/Engagency.Data.Worker.json:/app/Engagency.Data.Worker.json:z
+
+[Install]
+WantedBy=default.target

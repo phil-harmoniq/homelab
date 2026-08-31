@@ -10,6 +10,7 @@ Environment=VPN_SERVICE_PROVIDER=nordvpn
 Environment=VPN_TYPE=wireguard
 Environment=SERVER_COUNTRIES="United States"
 Environment=TZ=America/New_York
+Environment=FIREWALL_VPN_INPUT_PORTS=6881
 Environment=FIREWALL_OUTBOUND_SUBNETS=10.1.1.0/24,10.1.2.0/24
 Secret=wg_private_key,type=env,target=WIREGUARD_PRIVATE_KEY
 

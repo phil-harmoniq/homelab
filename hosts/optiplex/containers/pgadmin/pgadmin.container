@@ -14,9 +14,9 @@ Network=devops.network
 HostName=pgadmin
 PublishPort=8443:443
 
-Environment="PGADMIN_DEFAULT_EMAIL=admin@optiplex.lan"
-Environment="PGADMIN_DEFAULT_PASSWORD=admin"
-Environment="PGADMIN_ENABLE_TLS=True"
+# Environment="PGADMIN_DEFAULT_EMAIL=admin@optiplex.lan"
+# Environment="PGADMIN_DEFAULT_PASSWORD=admin"
+# Environment="PGADMIN_ENABLE_TLS=True"
 
 # # --- LDAP Configuration ---
 # Environment=PGADMIN_CONFIG_AUTHENTICATION_SOURCES="['ldap', 'internal']"

@@ -1,138 +1,398 @@
-# Raspberry Pi Talos Kubernetes Cluster
+# Homelab: 3-Node Talos Kubernetes Cluster
 
-A three-node, highly-available Kubernetes cluster running on Raspberry Pi 4s with
-[Talos Linux](https://www.talos.dev/), using [Cilium](https://cilium.io/) for
-networking (CNI, kube-proxy replacement, load balancing, and Gateway API ingress).
+A self-hosted, high-availability homelab built on a 3-node Raspberry Pi 4 cluster running
+[Talos Linux](https://www.talos.dev/) and Kubernetes. It provides HA Postgres, redundant DNS,
+automated trusted TLS, and a full self-hosted single-sign-on (SSO) identity stack that real
+services authenticate against.
 
-Every node is both a control-plane and a worker, giving etcd quorum across three
-nodes: the cluster tolerates any single node going down — for a reboot, an update,
-or a failure — without losing the API, the workloads, or external load-balancer
-traffic.
+> **Status:** working and stress-tested (node loss, database primary failover, and LoadBalancer
+> failover all validated). Built incrementally as a learning project.
 
-> This started as a learning project and turned into a genuinely resilient homelab
-> platform. It's shared as a reference for anyone with similar hardware and goals.
-> Adjust the IPs, hostnames, and interface names to match your own network.
+---
+
+## Contents
+
+- [Homelab: 3-Node Talos Kubernetes Cluster](#homelab-3-node-talos-kubernetes-cluster)
+  - [Contents](#contents)
+  - [Architecture at a glance](#architecture-at-a-glance)
+  - [Hardware \& platform](#hardware--platform)
+  - [Networking](#networking)
+    - [Reserved LoadBalancer IPs](#reserved-loadbalancer-ips)
+    - [Gateway listeners](#gateway-listeners)
+  - [Storage](#storage)
+  - [TLS / certificates](#tls--certificates)
+  - [Stateful services](#stateful-services)
+    - [PostgreSQL — CloudNativePG](#postgresql--cloudnativepg)
+    - [DNS — Technitium (hidden-primary cluster)](#dns--technitium-hidden-primary-cluster)
+  - [Identity \& SSO](#identity--sso)
+    - [Service integrations](#service-integrations)
+  - [Observability](#observability)
+  - [Naming \& domain conventions](#naming--domain-conventions)
+  - [Namespaces](#namespaces)
+  - [Secrets \& things you must not lose](#secrets--things-you-must-not-lose)
+  - [Operational gotchas (hard-won lessons)](#operational-gotchas-hard-won-lessons)
+  - [Updating components](#updating-components)
+  - [Repository layout (manifests)](#repository-layout-manifests)
+
+---
 
 ## Architecture at a glance
 
+```mermaid
+flowchart TB
+    subgraph ns_lan["Home LAN 10.1.1.0/24"]
+        client["Clients / family devices"]
+        optiplex["optiplex 10.1.1.2<br/>Hidden DNS primary<br/>Gitea, pgAdmin, Jellyfin, NPM"]
+    end
+
+    subgraph ns_cluster["Talos Kubernetes cluster rpi-1/2/3"]
+        gw["Cilium Gateway<br/>10.1.1.200<br/>star.fivelabs.tech TLS"]
+
+        subgraph ns_auth["namespace: auth"]
+            lldap["LLDAP<br/>user directory"]
+            authelia["Authelia<br/>OIDC provider"]
+            valkey["Valkey<br/>sessions"]
+        end
+
+        subgraph ns_default["namespace: default"]
+            pg["CloudNativePG<br/>3-instance HA Postgres"]
+        end
+
+        subgraph ns_mon["namespace: monitoring"]
+            graf["Grafana + Prometheus"]
+        end
+
+        dns["Technitium DNS<br/>DaemonSet, hostNetwork<br/>10.1.1.11/12/13"]
+    end
+
+    client -->|"DNS queries"| dns
+    dns -->|"zone xfer + config sync"| optiplex
+    client -->|"HTTPS"| gw
+    gw --> lldap
+    gw --> authelia
+    gw --> graf
+    authelia --> lldap
+    authelia --> valkey
+    authelia --> pg
+    lldap --> pg
+    optiplex -->|"OIDC"| authelia
+    optiplex -->|"LDAPS 636"| lldap
 ```
-                       Home network (10.1.1.0/24)
-                                  |
-                          FortiGate / router
-                                  |
-        +-------------------------+-------------------------+
-        |                         |                         |
-     rpi-1                     rpi-2                     rpi-3
-   10.1.1.11                 10.1.1.12                 10.1.1.13
-  control-plane             control-plane             control-plane
-    + worker                  + worker                  + worker
-        |                         |                         |
-        +----------- etcd quorum (survives 1 node down) ----+
 
-  Kubernetes API VIP:  10.1.1.10  (Talos-managed, floats between nodes)
-  LoadBalancer pool:   10.1.1.200 - 10.1.1.250  (Cilium LB-IPAM + L2)
-  Gateway (ingress):   10.1.1.200  ->  *.k8s.lan
+**Request & auth flows in words:**
+
+- Family devices get DNS from the three in-cluster Technitium secondaries (`10.1.1.11/12/13`).
+- Web apps are reached at `https://<app>.fivelabs.tech`, terminated with a trusted Let's Encrypt
+  cert at the Cilium Gateway (`10.1.1.200`).
+- **OIDC apps** (Gitea, pgAdmin) redirect to Authelia (`auth.fivelabs.tech`), which authenticates
+  the user against LLDAP, stores sessions in Valkey and state in Postgres.
+- **Jellyfin** authenticates **directly against LLDAP over LDAPS** (no Authelia in the path) so
+  native TV/phone clients keep working.
+
+---
+
+## Hardware & platform
+
+| Layer | Choice | Notes |
+|---|---|---|
+| Nodes | 3× Raspberry Pi 4 (8GB) | `rpi-1/2/3` = `10.1.1.11/12/13` |
+| Disks | Samsung 870 EVO SSD via USB3 UASP adapter | Replaced flash drives that couldn't sustain etcd fsync |
+| OS | Talos Linux (immutable, API-managed) | Install disk `/dev/sda` |
+| Kubernetes | v1.36.2 | Bootstrapped by Talos |
+| Roles | All 3 nodes control-plane **and** worker | `allowSchedulingOnControlPlanes: true` |
+| API endpoint | `https://10.1.1.10:6443` | Talos-managed VIP |
+
+The control plane tolerates one node failure (etcd quorum of 3). Node reboots rejoin etcd
+automatically (learner → full member).
+
+---
+
+## Networking
+
+Everything is handled by **Cilium** — no MetalLB, no Flannel, no kube-proxy.
+
+- **CNI + kube-proxy replacement** (via KubePrism at `localhost:7445`).
+- **LoadBalancer IPAM** — pool `10.1.1.200–250`, assigned via `CiliumLoadBalancerIPPool`.
+- **L2 announcement** — lease-based, on interface `end0`; proven failover with zero dropped requests.
+- **Gateway API** — a single `Gateway` ("main-gateway") pinned to `10.1.1.200`.
+
+### Reserved LoadBalancer IPs
+
+| IP | Service |
+|---|---|
+| `10.1.1.200` | Cilium Gateway (all `*.fivelabs.tech` web traffic) |
+| `10.1.1.201` | LLDAP LDAPS (`ldap.fivelabs.tech`, 636 → 6360) |
+| `10.1.1.202` | Postgres primary (`db.fivelabs.tech`, follows failover) |
+
+### Gateway listeners
+
+- **HTTP (80)** — a catch-all `HTTPRoute` that 301-redirects all `*.fivelabs.tech` to HTTPS.
+- **HTTPS (443, `https-fivelabs`)** — hostname `*.fivelabs.tech`, TLS terminated with the
+  wildcard cert. Apps attach with an `HTTPRoute` bound to `sectionName: https-fivelabs`.
+
+> **Adding a new web service:** create an `HTTPRoute` bound to `https-fivelabs`. It automatically
+> gets the wildcard cert **and** the HTTP→HTTPS redirect — no new DNS record or cert needed.
+
+---
+
+## Storage
+
+- **local-path-provisioner** is the default `StorageClass` — node-local storage on each SSD.
+- Path is `/var/local-path-provisioner` (**not** `/var/mnt`, which Talos mounts read-only).
+- `WaitForFirstConsumer` — a PVC stays `Pending` until a pod mounts it (this is normal).
+- Node-pinned: a volume lives on one node's disk; if that node is down, the pod waits for it.
+
+---
+
+## TLS / certificates
+
+- **cert-manager** with a **Let's Encrypt** `ClusterIssuer` using a **Cloudflare DNS-01** solver.
+- Issues a trusted **wildcard** cert for `fivelabs.tech` + `*.fivelabs.tech` (auto-renewing).
+- The cert is issued into every namespace that needs it (e.g. `default` for the Gateway, `auth`
+  for LLDAP's LDAPS) via per-namespace `Certificate` resources.
+
+> **Split-horizon note (important):** because internal Technitium is authoritative for
+> `fivelabs.tech`, cert-manager's DNS-01 self-check is forced onto public resolvers so it can see
+> the ACME TXT record at Cloudflare:
+>
+> ```
+> --dns01-recursive-nameservers-only
+> --dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53
+> ```
+>
+> Set via `helm upgrade cert-manager ... --set "extraArgs={...}"`. Without this, issuance hangs on
+> "record not yet propagated" even though the record is live publicly.
+
+Infrastructure names under `*.lan` / `*.k8s.lan` are fake TLDs and **cannot** get Let's Encrypt
+certs — they would need a local CA issuer (deferred).
+
+---
+
+## Stateful services
+
+### PostgreSQL — CloudNativePG
+
+- A 3-instance HA `Cluster` ("pg"), one instance per node (anti-affinity), streaming replication.
+- **Automatic failover** (~2s) — the `pg-rw` service always points at the current primary.
+- In-cluster: `pg-rw.default.svc.cluster.local:5432` (`sslmode=require`).
+- External: `10.1.1.202` / `db.fivelabs.tech` via a LoadBalancer that follows the primary.
+- **Per-app databases** are created declaratively with the `Database` CRD; **per-app roles** with
+  `managed.roles` in the Cluster spec.
+- Break-glass superuser is enabled for admin/emergency use only.
+
+### DNS — Technitium (hidden-primary cluster)
+
+- **Primary** (source of truth) runs *outside* the cluster on `optiplex` (10.1.1.2). It is
+  **hidden** — never handed to clients.
+- **Secondaries** run in-cluster as a **DaemonSet** with `hostNetwork`, bound to the node static
+  IPs `10.1.1.11/12/13`. These are the resolvers clients actually use (via DHCP).
+- A **configurator sidecar** applies per-node settings (DNS listener bound to the node IP, HTTPS
+  on 53443) via the Technitium HTTP API on boot, so the DaemonSet is reproducible.
+- Zones replicate primary → secondaries; config syncs via Technitium clustering.
+
+---
+
+## Identity & SSO
+
+All in namespace `auth`.
+
+```mermaid
+flowchart LR
+    user["User"]
+    app["App: Gitea / pgAdmin"]
+    authelia["Authelia<br/>auth.fivelabs.tech"]
+    lldap["LLDAP<br/>directory"]
+    valkey["Valkey<br/>sessions"]
+    pg["Postgres<br/>state"]
+    jellyfin["Jellyfin"]
+
+    user --> app
+    app -->|"OIDC redirect"| authelia
+    authelia --> lldap
+    authelia --> valkey
+    authelia --> pg
+    jellyfin -->|"LDAPS direct"| lldap
+    user --> jellyfin
 ```
 
-## Hardware
+| Component | Role |
+|---|---|
+| **LLDAP** | User directory (LDAP). Postgres-backed; stateless via a stable `KEY_SEED`. Web UI at `lldap.fivelabs.tech`; LDAPS on the LAN at `ldap.fivelabs.tech:636`. |
+| **Authelia** | OIDC identity provider. Authenticates against LLDAP; state in Postgres, sessions in Valkey. Portal at `auth.fivelabs.tech`. |
+| **Valkey** | Redis-compatible session store for Authelia (ephemeral, single replica). |
 
-| Component | Choice | Notes |
-|-----------|--------|-------|
-| Compute | 3x Raspberry Pi 4 (8GB) | arm64 |
-| Boot/storage | 3x Samsung 870 EVO 250GB SATA SSD | DRAM cache matters for etcd fsync |
-| Adapter | StarTech USB3S2SAT3CB (ASM1153E) | Known-good UASP bridge; boots over USB 3 |
+### Service integrations
 
-**Storage lesson learned:** the cluster was originally built on USB flash drives, which
-could not sustain etcd's fsync-heavy write pattern — this caused constant etcd
-"took too long" warnings and downstream instability. Proper SATA SSDs behind a
-quality UASP adapter fixed it completely. Do not use flash drives for etcd.
+| Service | Location | Method | Notes |
+|---|---|---|---|
+| Gitea | optiplex | **OIDC** via Authelia | Native OIDC support |
+| pgAdmin | optiplex | **OIDC** via Authelia | Configured in `config_local.py` |
+| Grafana | cluster | (planned OIDC) | Currently local login |
+| Jellyfin | optiplex | **LDAP direct** (LDAPS) | Authelia deliberately *not* in front — preserves native app clients |
+| NPM | optiplex | none | Legacy reverse proxy, being phased out |
 
-## Software versions
+**Design principle:** OIDC where the app supports it; LDAP-direct for Jellyfin so streaming
+clients keep working. Local break-glass accounts are always retained (e.g. Jellyfin `admin`/`tv`,
+pgAdmin `internal` during rollout).
 
-| Layer | Version |
-|-------|---------|
-| Talos Linux | v1.13.6 |
-| Kubernetes | v1.36.2 |
-| Cilium | 1.19.6 |
-| Gateway API CRDs | v1.3.0 (+ experimental TLSRoute) |
+---
 
-## Network layout
+## Observability
 
-| Purpose | Value |
-|---------|-------|
-| Node rpi-1 | `10.1.1.11` / `rpi-1.lan` |
-| Node rpi-2 | `10.1.1.12` / `rpi-2.lan` |
-| Node rpi-3 | `10.1.1.13` / `rpi-3.lan` |
-| Kubernetes API VIP | `10.1.1.10` (`https://10.1.1.10:6443`) |
-| LoadBalancer IP pool | `10.1.1.200` - `10.1.1.250` |
-| Gateway / ingress entry | `10.1.1.200` |
-| App hostname wildcard | `*.k8s.lan` -> `10.1.1.200` (DNS) |
-| Node NIC | `end0` (driver `bcmgenet`) |
+- **kube-prometheus-stack** (Helm) in namespace `monitoring`: Prometheus, Grafana, Alertmanager,
+  kube-state-metrics, and node-exporter.
+- The `monitoring` namespace must enforce PodSecurity **`privileged`** — node-exporter legitimately
+  requires `hostNetwork`, `hostPID`, `hostPath`, and a `hostPort`.
+- Grafana is exposed at `grafana.fivelabs.tech` via the Gateway (TLS, wildcard cert, no new DNS).
 
-Static node IPs are assigned via DHCP reservation on the router. `*.k8s.lan` is a
-wildcard A record on the home DNS server pointing at the Gateway IP, so any app
-exposed as `something.k8s.lan` resolves to the single ingress entry point.
+---
 
-## Key design decisions
+## Naming & domain conventions
 
-- **All nodes are control-plane + worker.** Three control planes give etcd quorum
-  (tolerates one failure); `allowSchedulingOnControlPlanes: true` lets them also run
-  workloads. Right choice for a small HA cluster.
-- **Cilium instead of the defaults.** Flannel and kube-proxy are disabled in the Talos
-  machine config (`cni: none`, `proxy.disabled: true`); Cilium provides the CNI,
-  kube-proxy replacement (via Talos KubePrism at `localhost:7445`), LoadBalancer
-  IP assignment (LB-IPAM), L2 announcement, and Gateway API ingress — one component
-  for the whole network stack.
-- **Gateway API instead of an Ingress controller.** The Cilium-native Gateway API is
-  the modern, supported path (classic Ingress controllers are being wound down) and
-  reuses the same LB-IPAM + L2 machinery, so LoadBalancer failover applies to ingress
-  automatically.
-- **Talos VIP for the API server.** A shared virtual IP (`10.1.1.10`) fronts the
-  Kubernetes API so `kubectl` survives any single node going down.
+| Pattern | Meaning | TLS |
+|---|---|---|
+| `*.fivelabs.tech` | Family-facing / "complete" services. Real registered domain, used **only internally**. | Let's Encrypt (trusted) |
+| `*.lan`, `*.k8s.lan` | Infrastructure. Fake TLDs. | Would need a local CA (deferred) |
 
-## Repository contents
+DNS specifics:
+- `*.fivelabs.tech` wildcard → `10.1.1.200` (the Gateway).
+- Specific records **override** the wildcard — e.g. `db.fivelabs.tech` → `10.1.1.202`,
+  `ldap.fivelabs.tech` → `10.1.1.201`. When migrating a service off optiplex, delete its specific
+  `10.1.1.2` record so the wildcard takes over.
 
-| File / dir | Purpose |
-|------------|---------|
-| `common.yaml` | Shared Talos machine-config patch: install disk, VIP, CNI-disable, scheduling |
-| `controlplane-rpi-N.yaml` | Per-node Talos machine configs (generated; **contain secrets — not committed**) |
-| `cilium-lb.yaml` | Cilium LoadBalancer IP pool + L2 announcement policy |
-| `gateway.yaml` | Gateway API entry point on `10.1.1.200` |
-| `local-path/` | Kustomize overlay for local-path-provisioner (default StorageClass) |
-| `rpi-schematic.yaml` | Talos Image Factory schematic (rpi_generic overlay) |
-| `build-talos-rpi-image.sh` | Builds/downloads the Talos image for flashing |
-| `apply.sh` | Applies machine config to the nodes |
+---
 
-**Talos Image Factory schematic ID:**
-`ee21ef4a5ef808a9b7484cc0dda0f25075021691c8c09a276591eedb638ea1f9`
-(the bare `rpi_generic` overlay, no extra system extensions).
+## Namespaces
 
-## Prerequisites
+| Namespace | Contents | PodSecurity |
+|---|---|---|
+| `default` | Cilium Gateway, CNPG Postgres cluster + LB, wildcard Certificate | (warns at restricted) |
+| `auth` | LLDAP, Authelia, Valkey | baseline |
+| `monitoring` | kube-prometheus-stack | **privileged** |
+| `technitium` | DNS DaemonSet | **privileged** (hostNetwork) |
+| `cnpg-system` | CloudNativePG operator | — |
+| `cert-manager` | cert-manager | — |
+| `local-path-storage` | storage provisioner | privileged |
 
-- `talosctl`, `kubectl`, and `helm` on your workstation (matching the Talos version above)
-- Raspberry Pi 4s with USB boot enabled in the EEPROM
-- A DHCP server for static reservations and a LAN DNS server for the `*.k8s.lan` wildcard
-- The secrets bundle (`secrets.yaml`) — see "Secrets" below; **not** included in this repo
+---
 
-## High-level setup
+## Secrets & things you must not lose
 
-1. Build the Talos image from the schematic and flash each SSD.
-2. Boot the Pis into maintenance mode; confirm the disk and check `dmesg` for USB errors.
-3. Apply per-node configs: `talosctl apply-config --insecure -n <ip> --file controlplane-rpi-N.yaml --config-patch @common.yaml`.
-4. Bootstrap etcd **once** on a single node: `talosctl bootstrap -n 10.1.1.11`.
-5. Fetch kubeconfig: `talosctl -n 10.1.1.11 kubeconfig`.
-6. Install Cilium (kube-proxy replacement, L2 announcements, Gateway API) via Helm.
-7. Apply `cilium-lb.yaml` (IP pool + L2 policy) and `gateway.yaml` (ingress).
-8. Install a StorageClass (`local-path/`) before deploying anything stateful.
+**Kept out of git** (documented as required, created out-of-band):
 
-## Secrets
+- CNPG app/role secrets (`lldap-db-app`, `authelia-db-app`, `pg-app`)
+- `lldap-secrets`, `authelia-secrets`, `valkey-auth`
+- Cloudflare API token (`cloudflare-api-token`, namespace `cert-manager`)
+- Technitium admin password
+- Plaintext OIDC client secrets (live on the app side: Gitea auth source, pgAdmin `config_local.py`)
+- `talosconfig`, `kubeconfig`, per-node Talos machine configs
 
-The rendered Talos machine configs embed the cluster CA and bootstrap secrets, so they
-are **not** committed. Credentials are kept out of git entirely:
+**Permanent — losing these is unrecoverable:**
 
-- `secrets.yaml` — Talos secret bundle (source of truth for the cluster's identity)
-- `talosconfig` — Talos API client credentials
-- `kubeconfig` — Kubernetes admin credentials
+| Secret | Consequence if lost/changed |
+|---|---|
+| LLDAP `KEY_SEED` | Invalidates **all** stored user passwords |
+| Authelia `storage-encryption-key` | Makes stored TOTP secrets & OIDC tokens unrecoverable |
 
-Store these in a password manager or encrypted secret store. Machine configs are
-regenerated from `secrets.yaml` + the committed patches when needed.
+Back these up somewhere durable and offline.
+
+---
+
+## Operational gotchas (hard-won lessons)
+
+- **Talos `/var/mnt` is read-only** (reserved for user volumes). Use `/var/local-path-provisioner`
+  for the storage provisioner path.
+- **Talos runs host DNS on `127.0.0.53:53`.** A `hostNetwork` DNS server (Technitium) must bind the
+  **specific node IP**, not `0.0.0.0`, or the `:53` bind fails.
+- **cert-manager split-horizon:** point the DNS-01 self-check at public resolvers (see
+  [TLS](#tls--certificates)).
+- **Cilium + cert-manager Gateway TLS:** create the `Certificate` (and its `kubernetes.io/tls`
+  Secret) **before** the Gateway listener references it — otherwise Cilium pre-creates an `Opaque`
+  placeholder secret that blocks cert-manager.
+- **Technitium zone transfer + NAT:** if the primary runs on a NAT'd container network (e.g. a
+  podman bridge with published ports), inbound source IPs are masqueraded to the bridge gateway, so
+  **IP-based zone-transfer ACLs won't match** the real secondary IPs. Use host networking, or allow
+  the transfer explicitly.
+- **LLDAP entrypoint runs `chown` unconditionally.** Under a locked-down `securityContext` it needs
+  either to start as root (with `CHOWN`/`SETUID`/`SETGID`/`DAC_OVERRIDE` capabilities) or a fully
+  non-root image variant.
+- **Authelia is strict about config** — a single bad key stops it booting (which takes down auth for
+  everything behind it). Notable: set `enableServiceLinks: false` (k8s injects `AUTHELIA_*` service
+  env vars it misreads); OIDC requires ≥1 client and a `jwks` key; the issuer key is injected via
+  the config **template filter** (`X_AUTHELIA_CONFIG_FILTERS=template`), not an env var.
+- **kube-prometheus-stack node-exporter** needs the namespace at PodSecurity `privileged`; after
+  relabeling, roll the DaemonSet so it retries admission.
+- **`kubectl apply` says "unchanged"** when the file on disk wasn't actually rewritten — delete +
+  recreate to force a clean roll when in doubt.
+- **`kubectl logs deploy/x`** grabs only one pod; use `-l <selector> --prefix` to see all replicas
+  during a rollout.
+
+---
+
+## Updating components
+
+Nothing here auto-updates. Every workload uses a **pinned image tag** (never `:latest`), so
+updates are explicit and rollbacks are trivial. The mechanism differs by how each thing was
+deployed:
+
+| Component | How it was deployed | How to update |
+|---|---|---|
+| CloudNativePG **operator** | Helm | `helm repo update && helm upgrade cnpg cnpg/cloudnative-pg -n cnpg-system` |
+| **PostgreSQL version** (the database) | CNPG `Cluster` resource | Edit `imageName` in `pg-cluster.yaml`, apply — CNPG does a rolling update (replicas first, then a switchover) |
+| cert-manager | Helm | `helm upgrade cert-manager jetstack/cert-manager -n cert-manager` (preserve custom `extraArgs` — see TLS note) |
+| kube-prometheus-stack | Helm | `helm repo update && helm upgrade prometheus prometheus-community/kube-prometheus-stack -n monitoring` |
+| Technitium, LLDAP, Authelia, Valkey | plain Deployment / DaemonSet | Edit the image tag in the manifest, `kubectl apply`, watch `kubectl rollout status` |
+
+**Safe update pattern for stateful components:**
+
+1. **Read the release notes** — especially for major version bumps (breaking changes, migrations).
+2. **Back up first** — CNPG backup for Postgres; Settings → Backup export for Technitium.
+3. **Bump the pinned tag** in the manifest (keep it explicit).
+4. **Apply and watch the rollout** (`kubectl rollout status`, check logs).
+5. **Verify**, and roll back if needed (`kubectl rollout undo`, re-apply the old tag, or restore a backup).
+6. **Commit** the version bump so the repo matches reality.
+
+**Notes:**
+
+- **Postgres minor** bumps (18.1 → 18.2) are safe rolling updates. **Major** bumps (18 → 19)
+  involve a real migration — read the CNPG release notes first.
+- **Technitium is a cluster** — keep the primary (optiplex quadlet) and the k8s secondaries on
+  **matching versions**; update them together to avoid version skew.
+- Finding new versions is manual (Docker Hub / GitHub releases, or `helm search repo <chart>
+  --versions`). Tools like [Renovate](https://github.com/renovatebot/renovate) or
+  [Diun](https://crazymax.dev/diun/) can watch for new tags and notify — optional for a homelab
+  this size.
+
+---
+
+## Repository layout (manifests)
+
+Representative — adjust to your tree.
+
+```
+hosts/talos/
+├── common.yaml                 # shared Talos patch (install disk, VIP, Cilium-ready)
+├── controlplane-rpi-{1,2,3}.yaml  # per-node configs (GITIGNORED — embed secrets)
+├── cilium-lb.yaml              # LoadBalancer IP pool + L2 announcement policy
+├── gateway.yaml                # Gateway + HTTP/HTTPS listeners
+├── fivelabs-redirect.yaml      # catch-all HTTP→HTTPS redirect
+├── local-path/                 # local-path-provisioner (kustomize)
+├── letsencrypt-issuers.yaml    # ACME ClusterIssuers (Cloudflare DNS-01)
+├── fivelabs-cert.yaml          # wildcard Certificate (default ns)
+├── fivelabs-cert-auth.yaml     # wildcard Certificate (auth ns, for LDAPS)
+├── pg-cluster.yaml             # CNPG Cluster + managed.roles
+├── pg-lb.yaml                  # Postgres primary LoadBalancer (.202)
+├── technitium.yaml             # DNS DaemonSet + configurator sidecar
+├── lldap.yaml                  # LLDAP + Service + LDAPS LoadBalancer + HTTPRoute
+├── lldap-database.yaml         # CNPG Database CRD
+├── valkey.yaml                 # Valkey session store
+├── authelia-config.yaml        # Authelia ConfigMap (committable — no private keys)
+├── authelia.yaml               # Authelia Deployment + Service + HTTPRoute
+├── authelia-database.yaml      # CNPG Database CRD
+└── grafana-route.yaml          # Grafana HTTPRoute
+```
+
+---
+
+*Built and documented as a learning project. Secrets and node configs are intentionally excluded
+from version control.*

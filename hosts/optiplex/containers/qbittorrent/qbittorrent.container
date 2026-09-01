@@ -3,6 +3,7 @@ Description=qBittorrent Container
 After=gluetun.service
 Requires=gluetun.service
 BindsTo=gluetun.service
+PartOf=gluetun.service
 
 [Container]
 ContainerName=qbittorrent
@@ -21,11 +22,12 @@ Environment=WEBUI_PORT=8080
 
 # All traffic routes through gluetun's netns
 Network=container:gluetun
-UserNS=keep-id:uid=1000,gid=1000
+UserNS=keep-id:uid=1000,gid=1001
 
 [Service]
 Restart=always
 TimeoutStopSec=30
+ExecStartPre=/bin/sleep 15
 
 [Install]
 WantedBy=default.target

@@ -18,6 +18,7 @@ HostName=nginx
 PublishPort=443:443
 PublishPort=81:81
 AddHost=host.containers.internal:host-gateway
+AddHost=auth.fivelabs.tech:10.1.1.200
 
 Environment=TZ=America/New_York
 Environment=FTLCONF_dns_listeningMode=all

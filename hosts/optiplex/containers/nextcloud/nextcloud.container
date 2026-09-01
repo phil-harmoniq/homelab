@@ -1,0 +1,46 @@
+[Unit]
+Description=Nextcloud
+After=network-online.target
+Requires=devops.network
+After=devops.network
+Requires=postgres.service
+After=postgres.service
+
+[Container]
+ContainerName=nextcloud
+Image=docker.io/nextcloud:apache
+AutoUpdate=registry
+
+Network=devops
+HostName=nextcloud
+
+# --- Database (your existing Postgres on devops) ---
+Environment=POSTGRES_HOST=postgres
+Environment=POSTGRES_DB=nextcloud
+Environment=POSTGRES_USER=nextcloud
+Secret=nextcloud_db_password,type=mount,target=/run/secrets/nextcloud_db_password
+Environment=POSTGRES_PASSWORD_FILE=/run/secrets/nextcloud_db_password
+
+# --- Initial admin (break-glass; OIDC layers on top later) ---
+Environment=NEXTCLOUD_ADMIN_USER=admin
+Secret=nextcloud_admin_password,type=mount,target=/run/secrets/nextcloud_admin_password
+Environment=NEXTCLOUD_ADMIN_PASSWORD_FILE=/run/secrets/nextcloud_admin_password
+
+# --- Reverse proxy / URL correctness behind NPM ---
+Environment=NEXTCLOUD_TRUSTED_DOMAINS=cloud.fivelabs.tech
+Environment=TRUSTED_PROXIES=10.89.0.0/16
+Environment=OVERWRITEPROTOCOL=https
+Environment=OVERWRITEHOST=cloud.fivelabs.tech
+Environment=OVERWRITECLIURL=https://cloud.fivelabs.tech
+
+Environment=PHP_UPLOAD_LIMIT=10G
+Environment=PHP_MEMORY_LIMIT=1G
+
+Volume=nextcloud-data:/var/www/html
+
+[Service]
+Restart=always
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

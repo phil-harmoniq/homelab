@@ -27,7 +27,10 @@ data:
           policy: 'bypass'
         - domain: '*.fivelabs.tech'
           policy: 'one_factor'
-
+        - domain: torrent.fivelabs.tech
+          policy: 'one_factor'
+          subject:
+            - "group:torrent"
     session:
       name: 'authelia_session'
       same_site: 'lax'
@@ -88,3 +91,18 @@ data:
               - 'authorization_code'
             token_endpoint_auth_method: 'client_secret_basic'
             userinfo_signed_response_alg: 'none'
+          - client_id: 'nextcloud'
+            client_name: 'Nextcloud'
+            client_secret: '$pbkdf2-sha512$310000$4B3botWnKIJlW41Pc4kWhg$3uxQFtZBJFFBe8zHi2Mfx/brcsZb4FmSPUQaP2qsLNopbw1rmA/21U/MKLgDDxwcBD6RgNhGPHUFs8.Q8k840A'   # the Digest from above
+            public: false
+            consent_mode: 'implicit'
+            authorization_policy: 'one_factor'
+            redirect_uris:
+              - 'https://cloud.fivelabs.tech/apps/user_oidc/code'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            userinfo_signed_response_alg: 'none'
+            token_endpoint_auth_method: 'client_secret_post'

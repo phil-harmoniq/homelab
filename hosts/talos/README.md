@@ -141,6 +141,10 @@ Everything is handled by **Cilium** — no MetalLB, no Flannel, no kube-proxy.
 - Path is `/var/local-path-provisioner` (**not** `/var/mnt`, which Talos mounts read-only).
 - `WaitForFirstConsumer` — a PVC stays `Pending` until a pod mounts it (this is normal).
 - Node-pinned: a volume lives on one node's disk; if that node is down, the pod waits for it.
+- **PVC size is effectively immutable** — local-path does **not** support volume expansion. You
+  cannot grow a PVC in place; changing storage size requires recreating the workload (see
+  [Updating components](#updating-components)). If you expect to resize storage, use a provisioner
+  that supports expansion (e.g. Longhorn) instead.
 
 ---
 
@@ -302,6 +306,11 @@ Back these up somewhere durable and offline.
 
 - **Talos `/var/mnt` is read-only** (reserved for user volumes). Use `/var/local-path-provisioner`
   for the storage provisioner path.
+- **local-path PVCs can't be resized — growing storage wedges CNPG.** Bumping a CNPG cluster's
+  `spec.storage.size` on local-path makes the operator try to resize existing PVCs; local-path
+  refuses, the reconcile loop errors every cycle (and stops creating/managing instances), and the
+  webhook then blocks shrinking the value back. Recovery = delete the `Cluster` + PVCs and recreate
+  at the target size, restoring from a `pg_dumpall` backup. Take the backup *before* touching size.
 - **Talos runs host DNS on `127.0.0.53:53`.** A `hostNetwork` DNS server (Technitium) must bind the
   **specific node IP**, not `0.0.0.0`, or the `:53` bind fails.
 - **cert-manager split-horizon:** point the DNS-01 self-check at public resolvers (see
@@ -356,6 +365,13 @@ deployed:
 
 - **Postgres minor** bumps (18.1 → 18.2) are safe rolling updates. **Major** bumps (18 → 19)
   involve a real migration — read the CNPG release notes first.
+- **Do NOT try to grow Postgres storage in place on local-path.** Bumping `spec.storage.size`
+  makes CNPG attempt a PVC resize, which local-path rejects — this *wedges the operator's reconcile
+  loop* (it errors every cycle and stops managing the cluster), and the validation webhook then
+  refuses to let you shrink the value back. The only reliable way to change storage size on
+  local-path is: **back up (`pg_dumpall`) → delete the `Cluster` and its PVCs → recreate at the new
+  size → restore the dump.** New PVCs provision at the new size with no resize involved. (Or migrate
+  to Longhorn, after which a `size:` bump works normally.)
 - **Technitium is a cluster** — keep the primary (optiplex quadlet) and the k8s secondaries on
   **matching versions**; update them together to avoid version skew.
 - Finding new versions is manual (Docker Hub / GitHub releases, or `helm search repo <chart>

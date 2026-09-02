@@ -1,0 +1,25 @@
+grafana:
+  # expose the client secret to Grafana as an env var
+  envFromSecrets:
+    - name: grafana-oidc
+  grafana.ini:
+    server:
+      root_url: https://grafana.fivelabs.tech
+    auth:
+      disable_login_form: true
+    auth.generic_oauth:
+      enabled: true
+      name: Authelia
+      client_id: grafana
+      client_secret: $__env{client_secret}
+      scopes: openid profile email groups
+      empty_scopes: false
+      auth_url: https://auth.fivelabs.tech/api/oidc/authorization
+      token_url: https://auth.fivelabs.tech/api/oidc/token
+      api_url: https://auth.fivelabs.tech/api/oidc/userinfo
+      login_attribute_path: preferred_username
+      groups_attribute_path: groups
+      name_attribute_path: name
+      use_pkce: true
+      # map LLDAP groups -> Grafana roles: admin group becomes Grafana Admin, everyone else Viewer
+      role_attribute_path: contains(groups[*], 'admin') && 'Admin' || 'Viewer'

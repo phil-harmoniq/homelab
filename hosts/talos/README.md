@@ -233,7 +233,7 @@ flowchart LR
 |---|---|---|---|
 | Gitea | optiplex | **OIDC** via Authelia | Native OIDC support |
 | pgAdmin | optiplex | **OIDC** via Authelia | Configured in `config_local.py` |
-| Grafana | cluster | (planned OIDC) | Currently local login |
+| Grafana | cluster | **OIDC** via Authelia | Local login form disabled; `admin` LLDAP group → Grafana Admin (via `role_attribute_path`), else Viewer |
 | Jellyfin | optiplex | **LDAP direct** (LDAPS) | Authelia deliberately *not* in front — preserves native app clients |
 | NPM | optiplex | none | Legacy reverse proxy, being phased out |
 
@@ -250,6 +250,12 @@ pgAdmin `internal` during rollout).
 - The `monitoring` namespace must enforce PodSecurity **`privileged`** — node-exporter legitimately
   requires `hostNetwork`, `hostPID`, `hostPath`, and a `hostPort`.
 - Grafana is exposed at `grafana.fivelabs.tech` via the Gateway (TLS, wildcard cert, no new DNS).
+- Grafana auth is **OIDC via Authelia** (`[auth.generic_oauth]` set through the chart's
+  `grafana.ini` values; client secret injected from the `grafana-oidc` Secret via `$__env{}`). The
+  local login form is disabled (`[auth] disable_login_form = true`) — break-glass is reverting that
+  value and re-running `helm upgrade`. `role_attribute_path` maps the `admin` LLDAP group to Grafana
+  **Admin**, everyone else to **Viewer**. Server-side token/userinfo calls use the public
+  `auth.fivelabs.tech` URLs (the Grafana pod reaches them fine via the Gateway).
 
 ---
 
@@ -289,8 +295,15 @@ mc ls -r localminio/cnpg-backups                    # base/ dirs + wals/ segment
 
 **Restore (disaster recovery):** CNPG restores by bootstrapping a *new* cluster from the
 `minio-store` ObjectStore via a `bootstrap.recovery` stanza (optionally to a specific point in time
-using the archived WAL). A restore has **not** yet been rehearsed on this cluster — worth doing once
-into a throwaway test cluster, because a backup is only proven when a restore succeeds.
+via `recoveryTarget.targetTime`, using the archived WAL). The recovery cluster must be **read-only**
+against the store — reference the source `serverName: pg` in an `externalClusters` entry and **omit**
+the top-level `plugins:` WAL-archiver block, so the test cluster can't overwrite the real backups
+(CNPG's "WAL archive check" safety net guards against this too).
+
+> **Restore verified:** last successfully test-restored **2026-09-01** — bootstrapped a throwaway
+> single-instance cluster from MinIO, confirmed all databases (`app`, `authelia`, `lldap`,
+> `engagency*`) and row-level data recovered, then tore it down. Re-test periodically (a backup
+> system that silently breaks is a classic failure mode).
 
 > **MinIO console caveat:** recent MinIO community builds ship a browser-only console (no
 > user/key/policy management in the UI). Create access keys and policies with the `mc` CLI
@@ -389,6 +402,14 @@ Back these up somewhere durable and offline.
   recreate to force a clean roll when in doubt.
 - **`kubectl logs deploy/x`** grabs only one pod; use `-l <selector> --prefix` to see all replicas
   during a rollout.
+- **OIDC client secrets are a matched pair from one `authelia crypto hash generate` run** — the
+  *plaintext* goes to the client (app), the *digest* goes to Authelia's client config. Regenerating
+  means updating **both** sides; updating only one gives a generic `invalid_client` at the token
+  exchange (the browser redirect still works, so it looks fine until the invisible server-side call
+  fails). Also mind `token_endpoint_auth_method` matching on both ends (`client_secret_post` vs
+  `client_secret_basic`).
+- **`kubectl apply` reporting `unchanged` when you expected a change means your edit didn't save** —
+  a surprisingly common cause of "I fixed it but nothing happened." Verify the file was written.
 
 ---
 
@@ -444,8 +465,8 @@ Known items intentionally not done yet, captured so they aren't forgotten:
   project also **secures MinIO backups**: issue a MinIO server cert from the local CA, serve HTTPS
   on optiplex, and point the `ObjectStore` at `https://` with `endpointCA` (closes the plaintext-HTTP
   backup limitation noted above).
-- **Rehearse a restore** — bootstrap a throwaway cluster from the `minio-store` ObjectStore to prove
-  DR actually works end to end (a backup is only proven by a successful restore).
+- **Re-test restores periodically** — a full restore was validated 2026-09-01 (see Backups). Repeat
+  every few months, since a backup pipeline can break silently; consider a calendar reminder.
 - **Longhorn** (or another expansion-capable provisioner) — for storage that survives node loss and
   supports in-place PVC resize (avoids the recreate-and-restore dance local-path forces). Justified
   once a single-instance, non-self-replicating stateful app is deployed.
@@ -483,6 +504,7 @@ hosts/talos/
 ├── authelia.yaml               # Authelia Deployment + Service + HTTPRoute
 ├── authelia-database.yaml      # CNPG Database CRD
 └── grafana-route.yaml          # Grafana HTTPRoute
+# grafana-oidc-values.yaml       # Helm values overlay: Grafana OIDC + role mapping (applied via helm upgrade)
 ```
 
 ---

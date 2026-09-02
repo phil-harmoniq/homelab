@@ -44,3 +44,9 @@ spec:
         login: true
         passwordSecret:
           name: authelia-db-app
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: minio-store

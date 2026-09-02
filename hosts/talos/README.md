@@ -27,11 +27,13 @@ services authenticate against.
   - [Identity \& SSO](#identity--sso)
     - [Service integrations](#service-integrations)
   - [Observability](#observability)
+  - [Backups \& disaster recovery](#backups--disaster-recovery)
   - [Naming \& domain conventions](#naming--domain-conventions)
   - [Namespaces](#namespaces)
   - [Secrets \& things you must not lose](#secrets--things-you-must-not-lose)
   - [Operational gotchas (hard-won lessons)](#operational-gotchas-hard-won-lessons)
   - [Updating components](#updating-components)
+  - [Deferred / future work](#deferred--future-work)
   - [Repository layout (manifests)](#repository-layout-manifests)
 
 ---
@@ -251,6 +253,58 @@ pgAdmin `internal` during rollout).
 
 ---
 
+## Backups & disaster recovery
+
+PostgreSQL is backed up to **MinIO** (S3-compatible object storage) running as a podman quadlet
+on **optiplex** (`10.1.1.2`) — deliberately *outside* the cluster, so backups survive the whole
+cluster failing. Backups use CNPG's **Barman Cloud Plugin** (the in-tree `barmanObjectStore` is
+removed as of CNPG 1.30).
+
+**What's protected & how:**
+
+| Piece | Detail |
+|---|---|
+| Object store | MinIO on optiplex, bucket `s3://cnpg-backups/`, endpoint `http://10.1.1.2:9000` |
+| Base backups | Nightly `ScheduledBackup` at `0 0 8 * * *` (08:00 UTC = 3 AM EST / 4 AM EDT) |
+| WAL archiving | Continuous (plugin `isWALArchiver: true`) — enables **point-in-time recovery** |
+| Compression | gzip on both base and WAL |
+| Retention | 30 days (older backups pruned automatically) |
+| Credentials | MinIO service-account key in Secret `minio-backup-creds` (namespace `default`, keys `ACCESS_KEY_ID` / `ACCESS_SECRET_KEY`) — **not** the MinIO root password |
+
+**Components:**
+
+- `ObjectStore` (`minio-store`) — connects CNPG to MinIO (`barmancloud.cnpg.io/v1`).
+- `Cluster` `plugins:` block — enables the plugin + WAL archiving on the `pg` cluster.
+- `ScheduledBackup` (`pg-nightly`) — the nightly base backup.
+- The **Barman Cloud Plugin** itself is installed in `cnpg-system` (depends on cert-manager, which
+  is already present).
+
+**Verifying backups land:**
+
+```bash
+kubectl -n default get backup                      # recent backups should show "completed"
+# from optiplex, list the bucket contents:
+mc ls -r localminio/cnpg-backups                    # base/ dirs + wals/ segments
+```
+
+**Restore (disaster recovery):** CNPG restores by bootstrapping a *new* cluster from the
+`minio-store` ObjectStore via a `bootstrap.recovery` stanza (optionally to a specific point in time
+using the archived WAL). A restore has **not** yet been rehearsed on this cluster — worth doing once
+into a throwaway test cluster, because a backup is only proven when a restore succeeds.
+
+> **MinIO console caveat:** recent MinIO community builds ship a browser-only console (no
+> user/key/policy management in the UI). Create access keys and policies with the `mc` CLI
+> (`mc admin user svcacct add ...`), not the web console.
+
+> **Known limitation — backup traffic is plaintext HTTP (accepted for now).** CNPG reaches MinIO
+> over `http://10.1.1.2:9000`, so the S3 credentials and backup data cross the LAN unencrypted.
+> This is an accepted tradeoff on the trusted home LAN. To secure it, give MinIO a TLS cert and
+> switch the `ObjectStore` to `https://` with the plugin's `endpointCA` field pointing at the
+> issuing CA. This is folded into the **future local-CA project** (see below) — issue a MinIO server
+> cert from the local root CA, serve HTTPS on optiplex, and have CNPG trust it via `endpointCA`.
+
+---
+
 ## Naming & domain conventions
 
 | Pattern | Meaning | TLS |
@@ -381,6 +435,27 @@ deployed:
 
 ---
 
+## Deferred / future work
+
+Known items intentionally not done yet, captured so they aren't forgotten:
+
+- **Local-CA issuer** (cert-manager `CA` issuer from the existing root CA) — needed to give TLS to
+  `*.k8s.lan` / `*.lan` infrastructure services (Let's Encrypt can't issue for fake TLDs). This
+  project also **secures MinIO backups**: issue a MinIO server cert from the local CA, serve HTTPS
+  on optiplex, and point the `ObjectStore` at `https://` with `endpointCA` (closes the plaintext-HTTP
+  backup limitation noted above).
+- **Rehearse a restore** — bootstrap a throwaway cluster from the `minio-store` ObjectStore to prove
+  DR actually works end to end (a backup is only proven by a successful restore).
+- **Longhorn** (or another expansion-capable provisioner) — for storage that survives node loss and
+  supports in-place PVC resize (avoids the recreate-and-restore dance local-path forces). Justified
+  once a single-instance, non-self-replicating stateful app is deployed.
+- **Cilium NetworkPolicies** — lock down who can reach Postgres (`.202`) and other services.
+- **TOTP 2FA + group-based authorization in Authelia** — enroll 2FA (via the `notification.txt`
+  link, no SMTP) and gate services by LLDAP group (`admins` / `family`).
+- **Migrate remaining optiplex services into the cluster** and retire NPM.
+
+---
+
 ## Repository layout (manifests)
 
 Representative — adjust to your tree.
@@ -396,8 +471,10 @@ hosts/talos/
 ├── letsencrypt-issuers.yaml    # ACME ClusterIssuers (Cloudflare DNS-01)
 ├── fivelabs-cert.yaml          # wildcard Certificate (default ns)
 ├── fivelabs-cert-auth.yaml     # wildcard Certificate (auth ns, for LDAPS)
-├── pg-cluster.yaml             # CNPG Cluster + managed.roles
+├── pg-cluster.yaml             # CNPG Cluster + managed.roles + backup plugin
 ├── pg-lb.yaml                  # Postgres primary LoadBalancer (.202)
+├── pg-objectstore.yaml         # Barman Cloud ObjectStore -> MinIO on optiplex
+├── pg-scheduledbackup.yaml     # nightly base backup (08:00 UTC)
 ├── technitium.yaml             # DNS DaemonSet + configurator sidecar
 ├── lldap.yaml                  # LLDAP + Service + LDAPS LoadBalancer + HTTPRoute
 ├── lldap-database.yaml         # CNPG Database CRD

@@ -8,11 +8,11 @@ ContainerName=pgadmin
 Image=docker.io/dpage/pgadmin4:9
 AutoUpdate=registry
 
-HealthCmd="wget -O - --no-check-certificate https://localhost:443/misc/ping"
+HealthCmd="wget -O - --no-check-certificate http://localhost:80/misc/ping"
 
 Network=devops.network
 HostName=pgadmin
-PublishPort=8443:443
+# PublishPort=8443:443
 
 # Environment="PGADMIN_DEFAULT_EMAIL=admin@optiplex.lan"
 # Environment="PGADMIN_DEFAULT_PASSWORD=admin"

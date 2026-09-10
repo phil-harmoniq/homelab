@@ -10,9 +10,9 @@ AutoUpdate=registry
 
 HealthCmd="wget -O - --no-check-certificate http://localhost:80/misc/ping"
 
-Network=devops.network
+Network=devops
 HostName=pgadmin
-# PublishPort=8443:443
+PublishPort=8443:443
 
 # Environment="PGADMIN_DEFAULT_EMAIL=admin@optiplex.lan"
 # Environment="PGADMIN_DEFAULT_PASSWORD=admin"
@@ -45,9 +45,12 @@ Volume=%h/homelab/hosts/optiplex/.certs/optiplex.lan.key:/certs/server.key:z
 Volume=%h/homelab/hosts/optiplex/.certs/optiplex.lan.cert:/certs/server.cert:z
 Volume=%h/homelab/hosts/optiplex/containers/pgadmin/config_local.py.secret:/pgadmin4/config_local.py:Z
 
-# [Service]
-# Restart=always
-# TimeoutStartSec=1000
+[Network]
+Options=mtu=1500
+
+[Service]
+Restart=always
+TimeoutStartSec=1000
 
 [Install]
 WantedBy=default.target

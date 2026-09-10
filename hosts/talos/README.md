@@ -1,9 +1,10 @@
 # Homelab: 3-Node Talos Kubernetes Cluster
 
 A self-hosted, high-availability homelab built on a 3-node Raspberry Pi 4 cluster running
-[Talos Linux](https://www.talos.dev/) and Kubernetes. It provides HA Postgres, redundant DNS,
-automated trusted TLS, and a full self-hosted single-sign-on (SSO) identity stack that real
-services authenticate against.
+[Talos Linux](https://www.talos.dev/) and Kubernetes. It provides HA Postgres (with off-cluster
+point-in-time backups), redundant DNS, automated trusted TLS, a full self-hosted single-sign-on
+(SSO) identity stack that real services authenticate against, and a unified observability stack
+(metrics + logs) in Grafana.
 
 > **Status:** working and stress-tested (node loss, database primary failover, and LoadBalancer
 > failover all validated). Built incrementally as a learning project.
@@ -26,7 +27,9 @@ services authenticate against.
     - [DNS — Technitium (hidden-primary cluster)](#dns--technitium-hidden-primary-cluster)
   - [Identity \& SSO](#identity--sso)
     - [Service integrations](#service-integrations)
-  - [Observability](#observability)
+  - [Observability (metrics \& logs)](#observability-metrics--logs)
+    - [Metrics](#metrics)
+    - [Logging (Loki)](#logging-loki)
   - [Backups \& disaster recovery](#backups--disaster-recovery)
   - [Naming \& domain conventions](#naming--domain-conventions)
   - [Namespaces](#namespaces)
@@ -243,7 +246,9 @@ pgAdmin `internal` during rollout).
 
 ---
 
-## Observability
+## Observability (metrics & logs)
+
+### Metrics
 
 - **kube-prometheus-stack** (Helm) in namespace `monitoring`: Prometheus, Grafana, Alertmanager,
   kube-state-metrics, and node-exporter.
@@ -256,6 +261,40 @@ pgAdmin `internal` during rollout).
   value and re-running `helm upgrade`. `role_attribute_path` maps the `admin` LLDAP group to Grafana
   **Admin**, everyone else to **Viewer**. Server-side token/userinfo calls use the public
   `auth.fivelabs.tech` URLs (the Grafana pod reaches them fine via the Gateway).
+
+### Logging (Loki)
+
+Log aggregation via **Grafana Loki**, queried in the same Grafana as metrics.
+
+| Piece | Detail |
+|---|---|
+| Store/query engine | **Loki** (Helm, `grafana-community/loki`), **Monolithic** mode, single replica, namespace `loki` |
+| Chunk storage | **MinIO** on optiplex (bucket `loki-logs`), same S3 backend pattern as Postgres backups |
+| Collection (cluster) | **Grafana Alloy** DaemonSet (namespace `alloy`, PodSecurity `privileged`) — scrapes every pod's stdout, labels with `namespace`/`pod`/`container`/`app`, ships to Loki. (Promtail is EOL; Alloy replaces it.) |
+| Collection (external app) | The ASP.NET app on optiplex pushes directly via the **`Serilog.Sinks.Grafana.Loki`** sink (JSON format) — it's outside the cluster, so Alloy doesn't cover it |
+| App push endpoint | `https://loki.fivelabs.tech` (HTTPRoute on the Gateway, TLS via wildcard cert) — the sink appends `/loki/api/v1/push` automatically |
+| Retention | 7 days (`retention_period: 168h` + compactor `retention_enabled`) |
+| Grafana datasource | Loki at `http://loki.loki.svc.cluster.local:3100` |
+
+**Label discipline (the core Loki concept):** labels are the index — keep them **few and
+low-cardinality** (`app`, `environment`, `namespace`). Everything else (versions, request IDs, the
+message, enriched properties) rides as log **content**, queried with a parser (`| json` or
+`| logfmt`), *not* promoted to labels. The Serilog sink is configured with
+`propertiesAsLabels: []` precisely to keep enriched properties as content.
+
+**Querying:** Go services (Loki, Authelia, cert-manager, CNPG) log **logfmt** → parse with
+`| logfmt`. The ASP.NET app logs **JSON** → parse with `| json`. Filter on the real level field
+(e.g. `| json | level=~"(?i)error|warn"`), not a substring `|= "error"` (which false-matches any
+line mentioning the word). Cluster logs and the app share one Loki; the app is queried by
+`{app="engagency"}` and also carries `namespace="engagency"` so it appears in the cluster dashboard's
+namespace dropdown.
+
+**Dashboards:** a "Cluster Logs Overview" (log volume, by-namespace, errors-by-namespace, recent
+error lines, with a `namespace` template variable) and a separate app-specific dashboard for the
+ASP.NET service.
+
+> Seq was retired in favour of Loki (licensing/open-source motivation); the Seq quadlet on optiplex
+> was decommissioned after a parallel bake period confirmed Loki captured everything.
 
 ---
 
@@ -340,6 +379,8 @@ DNS specifics:
 | `default` | Cilium Gateway, CNPG Postgres cluster + LB, wildcard Certificate | (warns at restricted) |
 | `auth` | LLDAP, Authelia, Valkey | baseline |
 | `monitoring` | kube-prometheus-stack | **privileged** |
+| `loki` | Loki (log store) | baseline |
+| `alloy` | Grafana Alloy (log collector DaemonSet) | **privileged** (hostPath log access) |
 | `technitium` | DNS DaemonSet | **privileged** (hostNetwork) |
 | `cnpg-system` | CloudNativePG operator | — |
 | `cert-manager` | cert-manager | — |
@@ -398,6 +439,18 @@ Back these up somewhere durable and offline.
   the config **template filter** (`X_AUTHELIA_CONFIG_FILTERS=template`), not an env var.
 - **kube-prometheus-stack node-exporter** needs the namespace at PodSecurity `privileged`; after
   relabeling, roll the DaemonSet so it retries admission.
+- **`169.254.169.254` in an S3 client's logs = "credentials not found."** It's the AWS EC2 metadata
+  endpoint; the SDK falls back to it when it got no keys, then times out. Seen with Loki when its
+  MinIO credentials weren't wired — it's a credentials problem, not a network one.
+- **The Loki Helm chart's S3-credential injection via `extraEnv`/`-config.expand-env=true` is
+  unreliable** (documented in upstream issues; it silently doesn't wire through for some pods/modes).
+  Pragmatic fix: put the MinIO key/secret **inline** in the `s3` config and gitignore the values
+  file (commit a `*.example.yaml` with placeholders). Also: the chart's default cache pods
+  (`chunks-cache`/`results-cache`) request too much memory to schedule on a Pi — disable them; and
+  default health-probe timeouts (`1s`) are too tight for ARM startup — loosen them.
+- **Loki chart chart-key renames:** the chart moved to the `grafana-community` repo, `SingleBinary`
+  became `Monolithic`, and the bundled MinIO is deprecated — use an external MinIO with
+  `minio.enabled: false`.
 - **`kubectl apply` says "unchanged"** when the file on disk wasn't actually rewritten — delete +
   recreate to force a clean roll when in doubt.
 - **`kubectl logs deploy/x`** grabs only one pod; use `-l <selector> --prefix` to see all replicas
@@ -425,6 +478,8 @@ deployed:
 | **PostgreSQL version** (the database) | CNPG `Cluster` resource | Edit `imageName` in `pg-cluster.yaml`, apply — CNPG does a rolling update (replicas first, then a switchover) |
 | cert-manager | Helm | `helm upgrade cert-manager jetstack/cert-manager -n cert-manager` (preserve custom `extraArgs` — see TLS note) |
 | kube-prometheus-stack | Helm | `helm repo update && helm upgrade prometheus prometheus-community/kube-prometheus-stack -n monitoring` |
+| Loki | Helm | `helm upgrade loki grafana-community/loki -n loki -f loki-values.yaml` (real values file, not the example) |
+| Alloy | Helm | `helm upgrade alloy grafana/alloy -n alloy -f alloy-values.yaml` |
 | Technitium, LLDAP, Authelia, Valkey | plain Deployment / DaemonSet | Edit the image tag in the manifest, `kubectl apply`, watch `kubectl rollout status` |
 
 **Safe update pattern for stateful components:**
@@ -503,7 +558,10 @@ hosts/talos/
 ├── authelia-config.yaml        # Authelia ConfigMap (committable — no private keys)
 ├── authelia.yaml               # Authelia Deployment + Service + HTTPRoute
 ├── authelia-database.yaml      # CNPG Database CRD
-└── grafana-route.yaml          # Grafana HTTPRoute
+├── grafana-route.yaml          # Grafana HTTPRoute
+├── loki-values.example.yaml    # Loki Helm values (real one GITIGNORED — inline MinIO creds)
+├── alloy-values.yaml           # Alloy DaemonSet Helm values (log collection)
+└── loki-route.yaml             # Loki HTTPRoute (loki.fivelabs.tech, for the external app push)
 # grafana-oidc-values.yaml       # Helm values overlay: Grafana OIDC + role mapping (applied via helm upgrade)
 ```
 

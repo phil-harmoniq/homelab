@@ -25,3 +25,5 @@ worker.yaml
 # Large / regenerable artifacts
 metal-arm64.raw
 *.raw
+
+loki-values.yaml

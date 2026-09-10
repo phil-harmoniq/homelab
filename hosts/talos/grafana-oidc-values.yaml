@@ -23,3 +23,12 @@ grafana:
       use_pkce: true
       # map LLDAP groups -> Grafana roles: admin group becomes Grafana Admin, everyone else Viewer
       role_attribute_path: contains(groups[*], 'admin') && 'Admin' || 'Viewer'
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      access: proxy
+      url: http://loki.loki.svc.cluster.local:3100
+      jsonData:
+        # tell Grafana which tenant header to send (single-tenant "fake")
+        # usually not needed with auth_enabled:false, but harmless to be explicit
+        maxLines: 1000

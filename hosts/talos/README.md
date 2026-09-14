@@ -237,12 +237,15 @@ flowchart LR
 | Gitea | optiplex | **OIDC** via Authelia | Native OIDC support |
 | pgAdmin | optiplex | **OIDC** via Authelia | Configured in `config_local.py` |
 | Grafana | cluster | **OIDC** via Authelia | Local login form disabled; `admin` LLDAP group → Grafana Admin (via `role_attribute_path`), else Viewer |
+| Nextcloud | optiplex | **OIDC** via Authelia (`user_oidc`) | `family` group required (enforced in Authelia `access_control`); `admin` group → Nextcloud admin; local form hidden, break-glass at `/login?direct=1` |
+| OnlyOffice | optiplex | **none** (rides Nextcloud) | Document Server trusts Nextcloud via shared JWT; not an Authelia client |
 | Jellyfin | optiplex | **LDAP direct** (LDAPS) | Authelia deliberately *not* in front — preserves native app clients |
 | NPM | optiplex | none | Legacy reverse proxy, being phased out |
 
 **Design principle:** OIDC where the app supports it; LDAP-direct for Jellyfin so streaming
-clients keep working. Local break-glass accounts are always retained (e.g. Jellyfin `admin`/`tv`,
-pgAdmin `internal` during rollout).
+clients keep working; OnlyOffice rides Nextcloud's session (never put an auth proxy in front of it).
+Local break-glass accounts are always retained (e.g. Jellyfin `admin`/`tv`, Nextcloud local `admin`
+via `/login?direct=1`).
 
 ---
 
@@ -463,6 +466,30 @@ Back these up somewhere durable and offline.
   `client_secret_basic`).
 - **`kubectl apply` reporting `unchanged` when you expected a change means your edit didn't save** —
   a surprisingly common cause of "I fixed it but nothing happened." Verify the file was written.
+- **Nextcloud blocks outbound requests to private IPs by default** (SSRF protection). Reaching an
+  internal service (e.g. Authelia at `10.1.1.200`) fails with "violates local access rules" until you
+  set `occ config:system:set allow_local_remote_servers --value=true`. `curl` from the container
+  works fine — it's a Nextcloud-specific guard, so the error only shows in Nextcloud's log.
+- **Install Nextcloud apps via `occ app:install`, not the web UI** — the app-store UI can return an
+  opaque `403` (session/permission quirk); the CLI just works and gives real errors.
+- **`user_oidc` hashes the username by default** (`uniqueUid: true`) — you get a GUID user ID instead
+  of the real name. Set `--unique-uid=0` (and `--mapping-uid=preferred_username`) for clean
+  usernames. This is OIDC's opaque `sub` at work; pgAdmin shows the same GUID for the same reason.
+- **Nextcloud brute-force throttling attributes attempts to the IP it *sees*** — behind a proxy that
+  can be the proxy's container IP, not the real client (even with `trusted_proxies` set). Find the
+  real one with `occ log:tail | grep "Remote IP"`, then `occ security:bruteforce:reset <ip>`.
+  Successful logins don't clear an existing throttle window.
+- **OnlyOffice rides Nextcloud's auth** — never put an auth proxy in front of the Document Server; it
+  authenticates to Nextcloud via a shared JWT (`jwt_secret` must match on both sides), independent of
+  how users log in.
+- **Don't run OnlyOffice Document Server on `:latest` + `AutoUpdate=registry`** — a container restart
+  silently upgrades it and can break the Nextcloud connector integration. Pin the version like
+  everything else. (Its `/healthcheck` endpoint returning `true` confirms the server itself is fine.)
+- **Client-side content blockers can break OnlyOffice** — uBlock/Ghostery false-positive-block the
+  editor's `Analytics.js` (blocked by *filename*, not because it's a tracker). Symptom: editor spins
+  forever; Network tab shows the asset "Stalled" and `ERR_FAILED` while `curl` gets `200`. That
+  combination (**Stalled + curl works**) always means a *client-side* block, not a server problem.
+  Ghostery's per-site pause doesn't override its network-layer rule; allowlist or remove it.
 
 ---
 

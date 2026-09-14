@@ -25,6 +25,10 @@ data:
       rules:
         - domain: 'auth.fivelabs.tech'
           policy: 'bypass'
+        - domain: 'cloud.fivelabs.tech'
+          policy: 'one_factor'
+          subject:
+            - 'group:family'
         - domain: '*.fivelabs.tech'
           policy: 'one_factor'
         - domain: torrent.fivelabs.tech
@@ -61,6 +65,8 @@ data:
         claims_policies:
           grafana:
             id_token: ['email', 'name', 'groups', 'preferred_username']
+          nextcloud:
+            id_token: ['groups', 'email', 'name', 'preferred_username']
         clients:
           - client_id: 'gitea'
             client_name: 'Gitea'
@@ -95,8 +101,9 @@ data:
             token_endpoint_auth_method: 'client_secret_basic'
             userinfo_signed_response_alg: 'none'
           - client_id: 'nextcloud'
+            claims_policy: 'nextcloud'
             client_name: 'Nextcloud'
-            client_secret: '$pbkdf2-sha512$310000$4B3botWnKIJlW41Pc4kWhg$3uxQFtZBJFFBe8zHi2Mfx/brcsZb4FmSPUQaP2qsLNopbw1rmA/21U/MKLgDDxwcBD6RgNhGPHUFs8.Q8k840A'   # the Digest from above
+            client_secret: '$pbkdf2-sha512$310000$txEF3Px.XHt8yObUSwLSiA$HBqwPrm/FuJ9K205IeiGvQUHHIs5ltlrO7HXm4/otIWST9JvHYu8Uu3lBQmk226ISvbudAe7zLvG0BHMd6yz.A'
             public: false
             consent_mode: 'implicit'
             authorization_policy: 'one_factor'

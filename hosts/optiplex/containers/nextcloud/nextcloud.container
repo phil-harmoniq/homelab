@@ -1,42 +1,42 @@
 [Unit]
 Description=Nextcloud
-After=network-online.target
-Requires=devops.network
-After=devops.network
-Requires=postgres.service
-After=postgres.service
+After=network-online.target postgres.service valkey.service
+Wants=network-online.target
+Requires=postgres.service valkey.service
 
 [Container]
 ContainerName=nextcloud
-Image=docker.io/nextcloud:apache
+Image=docker.io/library/nextcloud:apache
 AutoUpdate=registry
-
 Network=devops
-HostName=nextcloud
+Volume=nextcloud-data:/var/www/html
 
-# --- Database (your existing Postgres on devops) ---
+# --- Database (existing rootless Postgres, by container name) ---
 Environment=POSTGRES_HOST=postgres
 Environment=POSTGRES_DB=nextcloud
 Environment=POSTGRES_USER=nextcloud
-Secret=nextcloud_db_password,type=mount,target=/run/secrets/nextcloud_db_password
-Environment=POSTGRES_PASSWORD_FILE=/run/secrets/nextcloud_db_password
+Secret=nextcloud-db-password,type=env,target=POSTGRES_PASSWORD
 
-# --- Initial admin (break-glass; OIDC layers on top later) ---
-Environment=NEXTCLOUD_ADMIN_USER=admin
-Secret=nextcloud_admin_password,type=mount,target=/run/secrets/nextcloud_admin_password
-Environment=NEXTCLOUD_ADMIN_PASSWORD_FILE=/run/secrets/nextcloud_admin_password
+# --- Cache + file locking (existing Valkey; speaks the Redis protocol) ---
+Environment=REDIS_HOST=valkey
+Environment=REDIS_HOST_PORT=6379
+# If your Valkey requires auth, add a secret and uncomment:
+# Secret=valkey_password,type=env,target=REDIS_HOST_PASSWORD
 
-# --- Reverse proxy / URL correctness behind NPM ---
-Environment=NEXTCLOUD_TRUSTED_DOMAINS=cloud.fivelabs.tech
-Environment=TRUSTED_PROXIES=10.89.0.0/16
+# --- Reverse proxy / URL handling ---
+Environment=NEXTCLOUD_TRUSTED_DOMAINS=cloud.fivelabs.tech nextcloud
+Environment=TRUSTED_PROXIES=10.89.1.0/24
 Environment=OVERWRITEPROTOCOL=https
 Environment=OVERWRITEHOST=cloud.fivelabs.tech
 Environment=OVERWRITECLIURL=https://cloud.fivelabs.tech
 
+# --- PHP / uploads ---
 Environment=PHP_UPLOAD_LIMIT=10G
 Environment=PHP_MEMORY_LIMIT=1G
 
-Volume=nextcloud-data:/var/www/html
+# --- First-run admin (auto-installs; skip if you prefer the web installer) ---
+Environment=NEXTCLOUD_ADMIN_USER=admin
+Secret=nextcloud-admin-password,type=env,target=NEXTCLOUD_ADMIN_PASSWORD
 
 [Service]
 Restart=always

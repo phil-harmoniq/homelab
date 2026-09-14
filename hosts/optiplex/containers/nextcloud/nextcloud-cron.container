@@ -1,0 +1,20 @@
+[Unit]
+Description=Nextcloud cron
+After=nextcloud.service
+Requires=nextcloud.service
+
+[Container]
+ContainerName=nextcloud-cron
+Image=docker.io/library/nextcloud:apache
+AutoUpdate=registry
+Network=devops.network
+Volume=nextcloud-data:/var/www/html
+Exec=/cron.sh
+Environment=REDIS_HOST=valkey
+Environment=REDIS_HOST_PORT=6379
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

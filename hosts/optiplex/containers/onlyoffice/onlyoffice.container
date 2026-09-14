@@ -1,0 +1,22 @@
+[Unit]
+Description=ONLYOFFICE Document Server
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=onlyoffice
+Image=docker.io/onlyoffice/documentserver:9.4.0
+AutoUpdate=registry
+Network=devops
+Volume=onlyoffice-data:/var/www/onlyoffice/Data
+Volume=onlyoffice-log:/var/log/onlyoffice
+Volume=onlyoffice-db:/var/lib/postgresql
+Environment=JWT_ENABLED=true
+Secret=onlyoffice-jwt-secret,type=env,target=JWT_SECRET
+
+[Service]
+Restart=always
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

@@ -39,15 +39,15 @@ alloy:
           url = "http://loki.loki.svc.cluster.local:3100/loki/api/v1/push"
         }
       }
-  # Pi-appropriate resources
+
+  # Slightly higher requests so the agent isn't CPU-starved on the busy node
   resources:
     requests:
-      cpu: 100m
+      cpu: 150m
       memory: 128Mi
     limits:
       memory: 256Mi
 
-# run as a DaemonSet (one per node) — this is the default 'controller' for alloy,
-# but set explicitly for clarity
+# run as a DaemonSet (one per node)
 controller:
   type: daemonset

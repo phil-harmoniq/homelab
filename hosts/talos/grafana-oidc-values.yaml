@@ -1,3 +1,8 @@
+kubelet:
+  enabled: true
+  serviceMonitor:
+    insecureSkipVerify: true
+
 grafana:
   # expose the client secret to Grafana as an env var
   envFromSecrets:

@@ -35,6 +35,12 @@ point-in-time backups), redundant DNS, automated trusted TLS, a full self-hosted
   - [Namespaces](#namespaces)
   - [Secrets \& things you must not lose](#secrets--things-you-must-not-lose)
   - [Operational gotchas (hard-won lessons)](#operational-gotchas-hard-won-lessons)
+  - [Incident lessons / recovery playbook](#incident-lessons--recovery-playbook)
+    - [The catastrophic one: `allowSchedulingOnControlPlanes`](#the-catastrophic-one-allowschedulingoncontrolplanes)
+    - [CNPG replica timeline divergence after multi-node reboot](#cnpg-replica-timeline-divergence-after-multi-node-reboot)
+    - [metrics-server on Talos: kubelet cert TLS](#metrics-server-on-talos-kubelet-cert-tls)
+    - [Post-recovery load imbalance](#post-recovery-load-imbalance)
+    - [General recovery order](#general-recovery-order)
   - [Updating components](#updating-components)
   - [Deferred / future work](#deferred--future-work)
   - [Repository layout (manifests)](#repository-layout-manifests)
@@ -255,6 +261,10 @@ via `/login?direct=1`).
 
 - **kube-prometheus-stack** (Helm) in namespace `monitoring`: Prometheus, Grafana, Alertmanager,
   kube-state-metrics, and node-exporter.
+- **metrics-server** (Helm, `kube-system`) provides the Kubernetes Metrics API (`kubectl top`, live
+  CPU/memory in Freelens/dashboards). Installed with `--kubelet-insecure-tls` on Talos (see the
+  incident-lessons note on kubelet cert SANs). Kubelet serving-cert rotation is also enabled via a
+  `KubeletConfig` doc + the cert-approver.
 - The `monitoring` namespace must enforce PodSecurity **`privileged`** — node-exporter legitimately
   requires `hostNetwork`, `hostPID`, `hostPath`, and a `hostPort`.
 - Grafana is exposed at `grafana.fivelabs.tech` via the Gateway (TLS, wildcard cert, no new DNS).
@@ -490,6 +500,79 @@ Back these up somewhere durable and offline.
   forever; Network tab shows the asset "Stalled" and `ERR_FAILED` while `curl` gets `200`. That
   combination (**Stalled + curl works**) always means a *client-side* block, not a server problem.
   Ghostery's per-site pause doesn't override its network-layer rule; allowlist or remove it.
+
+---
+
+## Incident lessons / recovery playbook
+
+Hard-won from a real total outage (all pods unschedulable, every service down) triggered while
+applying a Talos config change. Written up because these are the failures that are painful to
+re-diagnose under pressure.
+
+### The catastrophic one: `allowSchedulingOnControlPlanes`
+
+**All nodes are control-plane. If `cluster.allowSchedulingOnControlPlanes: true` is dropped from the
+config, Talos re-applies the `node-role.kubernetes.io/control-plane:NoSchedule` taint to every node,
+and nothing can schedule — a full outage.** It's easy to lose when regenerating/editing configs (it
+lives as a *commented example* in generated configs).
+
+- **Symptom:** every non-system pod `Pending` with `FailedScheduling ... untolerated taint(s)`.
+  System pods (Cilium, control-plane) keep running because they tolerate all taints, which masks the
+  cause — the cluster looks half-up.
+- **Diagnose:** `kubectl get nodes -o custom-columns='NODE:.metadata.name,TAINTS:.spec.taints'` —
+  if you see `control-plane:NoSchedule` on every node, this is it.
+- **Fix:** ensure `allowSchedulingOnControlPlanes: true` under `cluster:` in every node's config
+  (and `common.yaml`), `talosctl apply-config` to all nodes. Talos removes the taint and everything
+  schedules on its own.
+- **Prevention:** this setting is load-bearing — keep it in `common.yaml` so config regeneration
+  can't silently drop it.
+
+### CNPG replica timeline divergence after multi-node reboot
+
+Rebooting all nodes can promote/demote the Postgres primary several times, incrementing the
+replication **timeline**. A replica can get stranded on an old timeline whose WAL diverged from the
+new primary and crashloop.
+
+- **Symptom:** one `pg-N` pod `CrashLoopBackOff`; logs show `record with incorrect prev-link ...`,
+  `primary server contains no more WAL on requested timeline N`, `Refusing to restore future
+  timeline history file`.
+- **Fix (safe — it's a replica, holds no unique data):** delete that instance's PVC and pod; CNPG
+  re-clones it fresh from the healthy primary:
+  ```
+  kubectl -n default delete pvc pg-N --wait=false && kubectl -n default delete pod pg-N
+  ```
+  Watch `kubectl get cluster pg -w` return to `3/3`. Confirm the primary has your data first
+  (`psql -c '\l'`), so you know the clone source is good.
+
+### metrics-server on Talos: kubelet cert TLS
+
+metrics-server scrapes kubelets by IP and verifies their TLS cert. Even with kubelet serving-cert
+rotation enabled (`KubeletConfig` `rotate-server-certificates: "true"` + the
+[kubelet-serving-cert-approver](https://github.com/alex1989hu/kubelet-serving-cert-approver) to
+approve the CSRs), the rotated cert **doesn't include the node IP as a SAN**, so verification still
+fails with `x509: cannot validate certificate for <ip> because it doesn't contain any IP SANs`.
+
+- **Pragmatic fix (the common standard):** install metrics-server with `--kubelet-insecure-tls`
+  (`helm ... --set 'args={--kubelet-insecure-tls}'`). Encrypted, unverified — fine on a trusted LAN.
+- Keep the kubelet cert rotation anyway (good hygiene); just don't require metrics-server to verify.
+- **Enabling cert rotation requires a reboot cycle** and generates pending CSRs that the approver
+  signs — do it in a maintenance window, not casually.
+
+### Post-recovery load imbalance
+
+When a taint clears and everything schedules at once, the scheduler can pack most single-replica
+Deployments onto one node. Symptom: the busiest node's pods fail readiness (e.g. an Alloy agent
+starved of CPU can't bind its port before the probe times out — `2/3` DaemonSet, one pod `1/2` with
+`connection refused` on the readiness probe, always the same node). `kubectl top nodes` shows that
+node much hotter than the others. A rollout restart (or deleting the packed node's heavier pods to
+let them reschedule) rebalances; Kubernetes does not auto-rebalance on its own.
+
+### General recovery order
+
+Diagnose top-down: **nodes Ready → Cilium/CNI healthy → taints/scheduling → per-workload**. Most
+"everything is down" situations are one layer (CNI or a taint), not N broken services. The pile of
+`Failed`/`Unknown` pods after an incident is mostly stale ReplicaSet corpses — sweep with
+`kubectl delete pods -A --field-selector=status.phase=Failed` once the real cause is fixed.
 
 ---
 

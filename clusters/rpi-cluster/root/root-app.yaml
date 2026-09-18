@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/phil-harmoniq/homelab.git
+    targetRevision: main
+    path: clusters/rpi-cluster/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy: {}   # manual for now — you'll sync it to adopt the child apps

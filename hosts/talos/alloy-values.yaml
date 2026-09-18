@@ -40,6 +40,24 @@ alloy:
         }
       }
 
+  # Loosened probes for slower ARM nodes under load (default 1s timeout too tight)
+  livenessProbe:
+    failureThreshold: 5
+    httpGet:
+      path: /-/ready
+      port: 12345
+    initialDelaySeconds: 30
+    periodSeconds: 15
+    timeoutSeconds: 5
+  readinessProbe:
+    failureThreshold: 5
+    httpGet:
+      path: /-/ready
+      port: 12345
+    initialDelaySeconds: 30
+    periodSeconds: 15
+    timeoutSeconds: 5
+
   # Slightly higher requests so the agent isn't CPU-starved on the busy node
   resources:
     requests:

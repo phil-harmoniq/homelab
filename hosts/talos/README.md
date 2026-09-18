@@ -38,7 +38,7 @@ point-in-time backups), redundant DNS, automated trusted TLS, a full self-hosted
   - [Incident lessons / recovery playbook](#incident-lessons--recovery-playbook)
     - [The catastrophic one: `allowSchedulingOnControlPlanes`](#the-catastrophic-one-allowschedulingoncontrolplanes)
     - [CNPG replica timeline divergence after multi-node reboot](#cnpg-replica-timeline-divergence-after-multi-node-reboot)
-    - [metrics-server on Talos: kubelet cert TLS](#metrics-server-on-talos-kubelet-cert-tls)
+    - [Talos kubelet cert: metrics-server AND Prometheus scrapes](#talos-kubelet-cert-metrics-server-and-prometheus-scrapes)
     - [Post-recovery load imbalance](#post-recovery-load-imbalance)
     - [General recovery order](#general-recovery-order)
   - [Updating components](#updating-components)
@@ -544,19 +544,29 @@ new primary and crashloop.
   Watch `kubectl get cluster pg -w` return to `3/3`. Confirm the primary has your data first
   (`psql -c '\l'`), so you know the clone source is good.
 
-### metrics-server on Talos: kubelet cert TLS
+### Talos kubelet cert: metrics-server AND Prometheus scrapes
 
-metrics-server scrapes kubelets by IP and verifies their TLS cert. Even with kubelet serving-cert
-rotation enabled (`KubeletConfig` `rotate-server-certificates: "true"` + the
-[kubelet-serving-cert-approver](https://github.com/alex1989hu/kubelet-serving-cert-approver) to
-approve the CSRs), the rotated cert **doesn't include the node IP as a SAN**, so verification still
-fails with `x509: cannot validate certificate for <ip> because it doesn't contain any IP SANs`.
+**The Talos kubelet's serving cert has no node-IP SAN** — its default self-signed cert carries only
+`DNS:<nodename>` (e.g. `DNS:rpi-1`), not the node IP. Anything that scrapes the kubelet **by IP**
+(`https://10.1.1.x:10250`) with TLS verification on fails with `x509: cannot validate certificate
+for <ip> because it doesn't contain any IP SANs`. This bit **both** metrics-server and Prometheus.
 
-- **Pragmatic fix (the common standard):** install metrics-server with `--kubelet-insecure-tls`
+- **This is not fixed by kubelet serving-cert rotation.** We tried `rotate-server-certificates` +
+  the [cert-approver](https://github.com/alex1989hu/kubelet-serving-cert-approver): the rotated
+  (cluster-CA-signed) cert *also* lacked an IP SAN, so verification still failed — just with a
+  different issuer. Rotation delivered no benefit and added complexity, so it was **reverted**. The
+  pragmatic, standard answer is to skip verification for kubelet scrapes.
+- **metrics-server:** install with `--kubelet-insecure-tls`
   (`helm ... --set 'args={--kubelet-insecure-tls}'`). Encrypted, unverified — fine on a trusted LAN.
-- Keep the kubelet cert rotation anyway (good hygiene); just don't require metrics-server to verify.
-- **Enabling cert rotation requires a reboot cycle** and generates pending CSRs that the approver
-  signs — do it in a maintenance window, not casually.
+- **Prometheus (kube-prometheus-stack):** the kubelet `ServiceMonitor` needs BOTH
+  `tlsConfig.insecureSkipVerify: true` AND bearer-token auth (`authorization` / the SA token) — the
+  kubelet returns `401` if scraped without a token. Set these via
+  `kubelet.serviceMonitor.tlsConfig.insecureSkipVerify: true` in the chart values (note the
+  `tlsConfig.` nesting — the un-nested key is stale and silently doesn't render). A clean chart
+  install renders the auth block automatically; a *drifted* release had lost it, causing the 401.
+- **Debugging order that cracked it:** the scrape error walked `IP-SAN TLS failure` → (after
+  skip-verify) `401 Unauthorized` → (after adding token) `up`. Each error pointed to the next fix.
+  Lesson: with kubelet scrapes, expect to handle *both* TLS-skip and token auth.
 
 ### Post-recovery load imbalance
 
@@ -587,7 +597,8 @@ deployed:
 | CloudNativePG **operator** | Helm | `helm repo update && helm upgrade cnpg cnpg/cloudnative-pg -n cnpg-system` |
 | **PostgreSQL version** (the database) | CNPG `Cluster` resource | Edit `imageName` in `pg-cluster.yaml`, apply — CNPG does a rolling update (replicas first, then a switchover) |
 | cert-manager | Helm | `helm upgrade cert-manager jetstack/cert-manager -n cert-manager` (preserve custom `extraArgs` — see TLS note) |
-| kube-prometheus-stack | Helm | `helm repo update && helm upgrade prometheus prometheus-community/kube-prometheus-stack -n monitoring` |
+| kube-prometheus-stack | Helm | `helm repo update && helm upgrade prometheus prometheus-community/kube-prometheus-stack -n monitoring -f kube-prometheus-stack-values.yaml` |
+| metrics-server | Helm | `helm upgrade metrics-server metrics-server/metrics-server -n kube-system --set 'args={--kubelet-insecure-tls}'` |
 | Loki | Helm | `helm upgrade loki grafana-community/loki -n loki -f loki-values.yaml` (real values file, not the example) |
 | Alloy | Helm | `helm upgrade alloy grafana/alloy -n alloy -f alloy-values.yaml` |
 | Technitium, LLDAP, Authelia, Valkey | plain Deployment / DaemonSet | Edit the image tag in the manifest, `kubectl apply`, watch `kubectl rollout status` |
@@ -618,6 +629,15 @@ deployed:
   --versions`). Tools like [Renovate](https://github.com/renovatebot/renovate) or
   [Diun](https://crazymax.dev/diun/) can watch for new tags and notify — optional for a homelab
   this size.
+- **Always `helm upgrade -f <values-file>`; never `--reuse-values`.** `--reuse-values` keeps values
+  only in cluster state, so the committed file stops matching reality (repo drift). Every Helm
+  release here has a committed values file — pass it explicitly on every upgrade so the file stays
+  authoritative. (Reconciled 2026-09-17 after `--reuse-values` had caused drift; verified each file
+  produces a no-op upgrade against the live release.)
+- **Watch for renamed values keys on chart major bumps.** kube-prometheus-stack moved
+  `kubelet.serviceMonitor.insecureSkipVerify` → `kubelet.serviceMonitor.tlsConfig.insecureSkipVerify`;
+  the old key silently stops rendering (no error), which is how the kubelet scrape TLS config went
+  missing. Re-read the chart's values on major upgrades.
 
 ---
 
@@ -625,11 +645,30 @@ deployed:
 
 Known items intentionally not done yet, captured so they aren't forgotten:
 
+- **GitOps (Argo CD)** — *next up.* The recurring pain in this project has been **drift**: manual
+  `kubectl`/`helm` changes that don't flow back to git (the `allowSchedulingOnControlPlanes` omission
+  that caused a total outage, and the Helm `--reuse-values` drift reconciled on 2026-09-17). GitOps
+  makes git the single source of truth — the cluster continuously reconciles *to* the repo, so drift
+  is structurally prevented. Leaning **Argo CD** (matches what's used at work). This is the durable
+  fix for the whole class of drift problems and the right foundation for "the repo recreates the
+  cluster." Prereq groundwork already done: Helm values files are committed and faithful; secrets are
+  handled (gitignored + examples / documented).
+- **Cluster-recreate runbook** — an ordered, tested procedure in this README: Talos apply → bootstrap
+  → Cilium → CRDs → create secrets (list them) → Helm installs (`-f`) → apply manifests → verify.
+  Partially implied across sections; needs consolidating into one runbook. (Largely subsumed by
+  GitOps once that lands.)
+- **Capture remaining non-Helm bits as files** — the kubelet-serving-cert-approver (may now be
+  unneeded since cert rotation was reverted — verify), namespace PodSecurity labels, and the
+  create-first secret list (`grafana-oidc`, `loki-minio-creds`, `minio-backup-creds`,
+  `authelia-secrets`, etc. — these live outside git by design; the runbook must recreate them).
 - **Local-CA issuer** (cert-manager `CA` issuer from the existing root CA) — needed to give TLS to
   `*.k8s.lan` / `*.lan` infrastructure services (Let's Encrypt can't issue for fake TLDs). This
   project also **secures MinIO backups**: issue a MinIO server cert from the local CA, serve HTTPS
   on optiplex, and point the `ObjectStore` at `https://` with `endpointCA` (closes the plaintext-HTTP
   backup limitation noted above).
+- **Grafana dashboards as code** — the hand-built dashboards live only in Grafana's ephemeral
+  storage and are lost on a monitoring-stack reinstall. Provision them from labelled ConfigMaps
+  (`grafana_dashboard: "1"`) committed to git so they survive reinstalls.
 - **Re-test restores periodically** — a full restore was validated 2026-09-01 (see Backups). Repeat
   every few months, since a backup pipeline can break silently; consider a calendar reminder.
 - **Longhorn** (or another expansion-capable provisioner) — for storage that survives node loss and
@@ -669,10 +708,11 @@ hosts/talos/
 ├── authelia.yaml               # Authelia Deployment + Service + HTTPRoute
 ├── authelia-database.yaml      # CNPG Database CRD
 ├── grafana-route.yaml          # Grafana HTTPRoute
-├── loki-values.example.yaml    # Loki Helm values (real one GITIGNORED — inline MinIO creds)
+├── kube-prometheus-stack-values.yaml  # monitoring stack Helm values (Grafana OIDC + kubelet tlsConfig)
+├── loki-values.example.yaml    # Loki Helm values (real loki-values.yaml GITIGNORED — inline MinIO creds)
 ├── alloy-values.yaml           # Alloy DaemonSet Helm values (log collection)
 └── loki-route.yaml             # Loki HTTPRoute (loki.fivelabs.tech, for the external app push)
-# grafana-oidc-values.yaml       # Helm values overlay: Grafana OIDC + role mapping (applied via helm upgrade)
+# Secrets (create-first, NOT in git): grafana-oidc, loki-minio-creds, minio-backup-creds, authelia-secrets
 ```
 
 ---

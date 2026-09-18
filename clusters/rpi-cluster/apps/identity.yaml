@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: identity
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/phil-harmoniq/homelab.git
+    targetRevision: main
+    path: clusters/rpi-cluster/manifests/identity
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: auth
+  syncPolicy: {}

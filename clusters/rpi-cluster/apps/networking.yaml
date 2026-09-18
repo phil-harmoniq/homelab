@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: networking
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/phil-harmoniq/homelab.git
+    targetRevision: main
+    path: clusters/rpi-cluster/manifests/networking
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy: {}   # MANUAL — Argo will show diffs but won't change anything until you click Sync

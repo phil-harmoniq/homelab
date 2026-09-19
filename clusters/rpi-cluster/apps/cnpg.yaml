@@ -15,15 +15,12 @@ spec:
   syncPolicy:
     syncOptions:
       - ServerSideApply=true
-      # NOTE: no automated prune; and Prune is disabled at sync time below
   ignoreDifferences:
-    # CNPG heavily mutates the Cluster resource — ignore operator-managed fields
     - group: postgresql.cnpg.io
       kind: Cluster
       jqPathExpressions:
-        - '.spec.instances'         # CNPG adjusts during failover
-        - '.status'                 # entirely operator-managed
-    - group: postgresql.cnpg.io
-      kind: Cluster
-      jsonPointers:
-        - /metadata/annotations/cnpg.io~1operatorVersion
+        - '.spec.instances'
+        - '.status'
+        - '.spec.managed.roles[].connectionLimit'
+        - '.spec.managed.roles[].inherit'
+        - '.spec.plugins[].enabled'

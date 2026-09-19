@@ -4,10 +4,11 @@ A self-hosted, high-availability homelab built on a 3-node Raspberry Pi 4 cluste
 [Talos Linux](https://www.talos.dev/) and Kubernetes. It provides HA Postgres (with off-cluster
 point-in-time backups), redundant DNS, automated trusted TLS, a full self-hosted single-sign-on
 (SSO) identity stack that real services authenticate against, and a unified observability stack
-(metrics + logs) in Grafana.
+(metrics + logs) in Grafana. **The whole cluster is managed via GitOps (Argo CD)** — this repo is
+the source of truth, and the cluster continuously reconciles to it.
 
 > **Status:** working and stress-tested (node loss, database primary failover, and LoadBalancer
-> failover all validated). Built incrementally as a learning project.
+> failover all validated). Fully GitOps-managed via Argo CD. Built incrementally as a learning project.
 
 ---
 
@@ -16,6 +17,12 @@ point-in-time backups), redundant DNS, automated trusted TLS, a full self-hosted
 - [Homelab: 3-Node Talos Kubernetes Cluster](#homelab-3-node-talos-kubernetes-cluster)
   - [Contents](#contents)
   - [Architecture at a glance](#architecture-at-a-glance)
+  - [GitOps (Argo CD)](#gitops-argo-cd)
+    - [Repo layout for GitOps](#repo-layout-for-gitops)
+    - [How it works](#how-it-works)
+    - [Secrets: Sealed Secrets](#secrets-sealed-secrets)
+    - [CNPG safety design](#cnpg-safety-design)
+    - [Bootstrap order (recreating from scratch)](#bootstrap-order-recreating-from-scratch)
   - [Hardware \& platform](#hardware--platform)
   - [Networking](#networking)
     - [Reserved LoadBalancer IPs](#reserved-loadbalancer-ips)
@@ -43,7 +50,7 @@ point-in-time backups), redundant DNS, automated trusted TLS, a full self-hosted
     - [General recovery order](#general-recovery-order)
   - [Updating components](#updating-components)
   - [Deferred / future work](#deferred--future-work)
-  - [Repository layout (manifests)](#repository-layout-manifests)
+  - [Repository layout](#repository-layout)
 
 ---
 
@@ -99,6 +106,81 @@ flowchart TB
   the user against LLDAP, stores sessions in Valkey and state in Postgres.
 - **Jellyfin** authenticates **directly against LLDAP over LDAPS** (no Authelia in the path) so
   native TV/phone clients keep working.
+
+---
+
+## GitOps (Argo CD)
+
+The cluster is managed with **Argo CD** using the **app-of-apps** pattern. This repo is the single
+source of truth: to change the cluster you edit a manifest, commit, and push — Argo reconciles the
+cluster to match. Most apps **auto-sync with self-heal**, so manual `kubectl`/`helm` drift is
+reverted automatically. This directly prevents the drift class that previously caused an outage (a
+dropped Talos setting) and repeated Helm `--reuse-values` divergence.
+
+### Repo layout for GitOps
+
+```
+clusters/rpi-cluster/
+├── bootstrap/     # Argo install (values + HTTPRoute) — the manual base layer
+├── root/
+│   └── root-app.yaml      # app-of-apps root: watches apps/, creates all child Applications
+├── apps/          # one Argo Application per component (the "index" of what's deployed)
+└── manifests/     # the actual k8s YAML + Helm values, per component
+    ├── networking/  storage/  dns/  cert-manager/
+    ├── identity/  monitoring/  loki/  alloy/  cnpg/  sealed-secrets/
+```
+
+Talos **node** config stays in `hosts/talos/` — it's managed by `talosctl`, **not** Argo (Argo
+manages in-cluster resources only).
+
+### How it works
+
+- **Root app** (`root/root-app.yaml`) points at `apps/`. Adding a component = commit a new
+  `apps/<name>.yaml` and push; the root creates the child Application automatically.
+- **Plain-manifest apps** (networking, dns, etc.) use a git `path` source.
+- **Helm apps** (loki, alloy, monitoring, sealed-secrets) use a Helm chart source. Where a component
+  also has plain manifests (routes, sealed secrets), a **multi-source** Application combines the Helm
+  chart with a git `path` source, using `ref: values` + `$values/...` so the Helm chart reads its
+  values file from git. The path source excludes the values YAMLs (they aren't k8s resources) via
+  `directory.exclude`.
+- **Sync policy:** everything auto-syncs (`prune: false`, `selfHeal: true`) **except CNPG**, which is
+  **deliberately manual** — database spec changes should be applied on purpose after review, never
+  auto-reconciled. `prune: false` everywhere means Argo never auto-deletes (safety over strict
+  GitOps for a homelab).
+
+### Secrets: Sealed Secrets
+
+Secrets are committed to git **encrypted** using [Sealed Secrets](https://github.com/bitnami/sealed-secrets):
+`kubeseal` encrypts a Secret with the controller's public key into a `SealedSecret` (safe to commit);
+the in-cluster controller decrypts it. Sealed secrets in this repo: `loki-s3-creds`, `grafana-oidc`,
+`grafana-admin`, `minio-backup-creds`.
+
+- **The controller's private key is the master key** — it decrypts everything. It's backed up
+  **off-cluster** (in the password manager), NOT in git. On a cluster rebuild, restore this key first
+  or every committed SealedSecret becomes undecryptable.
+- **Loki S3 creds** are injected as `AWS_*` env vars via `global.extraEnvFrom` (the AWS SDK reads
+  them natively) — this replaced inline creds, so `loki-values.yaml` is now committable.
+- **CNPG-generated secrets are NOT sealed** (`pg-app`, `pg-superuser`, the TLS certs,
+  `lldap-db-app`, `authelia-db-app`) — CNPG owns and manages those. Only the manually-created
+  `minio-backup-creds` needed sealing.
+
+### CNPG safety design
+
+The database is the highest-stakes component, so its Application has extra guards:
+- **Manual sync** (not auto) — deliberate application of any change.
+- **`Prune=false`** — Argo never deletes CNPG resources.
+- **`Delete=false` annotation** on the `pg` Cluster — even deleting the Application won't
+  cascade-delete the database.
+- **`ServerSideApply=true`** + `ignoreDifferences` for CNPG-mutated fields (`.status`,
+  `.spec.instances`, and defaulted role/plugin fields) so the operator's own changes don't show as
+  drift.
+- PVCs are CNPG-created (not in git), so Argo never manages/prunes them.
+
+### Bootstrap order (recreating from scratch)
+
+Argo can't manage what must exist before Argo: **Talos → Cilium (CNI) → Argo CD → Sealed Secrets
+controller (+ restore its master key) → create any not-in-git secrets → apply the root app** (which
+brings up everything else). See `bootstrap/` and the [recreate runbook](#deferred--future-work).
 
 ---
 
@@ -500,6 +582,29 @@ Back these up somewhere durable and offline.
   forever; Network tab shows the asset "Stalled" and `ERR_FAILED` while `curl` gets `200`. That
   combination (**Stalled + curl works**) always means a *client-side* block, not a server problem.
   Ghostery's per-site pause doesn't override its network-layer rule; allowlist or remove it.
+- **Argo only sees what's pushed to the git *remote*** — local commits (or uncommitted working-tree
+  changes) are invisible to Argo. "I fixed it but Argo didn't pick it up" almost always = forgot to
+  push. With auto-sync + self-heal on, an *uncommitted* local change also means a change you want
+  live won't apply until pushed (and self-heal may revert manual `kubectl` changes to match git).
+- **Sealing a secret whose name already exists** (manually created) fails: the SealedSecrets
+  controller won't adopt a secret it didn't create (`already exists and is not managed by
+  SealedSecret`). Fix: `kubectl delete secret <name>` so the controller can create its own. AND — the
+  controller *gives up* after retries and won't re-try on an unchanged spec, so after deleting the
+  manual secret you must **delete + recreate the SealedSecret CR** to force a fresh reconcile (a plain
+  re-apply of the same spec is a no-op).
+- **Large CRDs need `ServerSideApply=true`** — kube-prometheus-stack's Prometheus-operator CRDs
+  exceed the 256KB annotation limit that client-side apply uses (`last-applied-configuration`), so the
+  sync fails with `metadata.annotations: Too long`. Set `ServerSideApply=true` on that Application.
+- **Gateway API HTTPRoutes show phantom diffs under ServerSideApply** — the API server defaults
+  optional fields (`parentRefs[].group/kind`, `backendRefs[].group/kind/weight`) that SSA surfaces as
+  drift. Add `ignoreDifferences` (jqPathExpressions) for those fields on any SSA app managing routes.
+- **CNPG under Argo needs `ignoreDifferences`** — CNPG mutates the `Cluster` resource heavily
+  (`.status`, `.spec.instances` on failover) and normalizes defaulted fields
+  (`managed.roles[].connectionLimit/inherit`, `plugins[].enabled`), all of which show as perpetual
+  drift unless ignored.
+- **Sealed Secrets master key is the crown jewel** — it decrypts every SealedSecret. Back it up
+  off-cluster (password manager), never in git. Lose it and all committed SealedSecrets are
+  unrecoverable without re-sealing from plaintext.
 
 ---
 
@@ -588,11 +693,16 @@ Diagnose top-down: **nodes Ready → Cilium/CNI healthy → taints/scheduling �
 
 ## Updating components
 
-Nothing here auto-updates. Every workload uses a **pinned image tag** (never `:latest`), so
-updates are explicit and rollbacks are trivial. The mechanism differs by how each thing was
-deployed:
+**Under GitOps, updating means editing a manifest/values file, committing, and pushing** — Argo
+reconciles the change (auto-sync for most apps; **manual sync for CNPG**, so bump the Postgres image
+then sync the `cnpg` app deliberately). Every workload uses a **pinned image/chart version** (never
+`:latest`), so updates are explicit and rollback = revert the git commit. Version numbers live in the
+Helm values files (chart `targetRevision` in the `apps/*.yaml`) or the manifest image tags.
 
-| Component | How it was deployed | How to update |
+The pre-GitOps `helm upgrade`/`kubectl apply` mechanics below are retained as reference for what each
+component *is*, but the day-to-day path is now **git push → Argo reconcile**:
+
+| Component | Type | Where the version lives |
 |---|---|---|
 | CloudNativePG **operator** | Helm | `helm repo update && helm upgrade cnpg cnpg/cloudnative-pg -n cnpg-system` |
 | **PostgreSQL version** (the database) | CNPG `Cluster` resource | Edit `imageName` in `pg-cluster.yaml`, apply — CNPG does a rolling update (replicas first, then a switchover) |
@@ -645,30 +755,19 @@ deployed:
 
 Known items intentionally not done yet, captured so they aren't forgotten:
 
-- **GitOps (Argo CD)** — *next up.* The recurring pain in this project has been **drift**: manual
-  `kubectl`/`helm` changes that don't flow back to git (the `allowSchedulingOnControlPlanes` omission
-  that caused a total outage, and the Helm `--reuse-values` drift reconciled on 2026-09-17). GitOps
-  makes git the single source of truth — the cluster continuously reconciles *to* the repo, so drift
-  is structurally prevented. Leaning **Argo CD** (matches what's used at work). This is the durable
-  fix for the whole class of drift problems and the right foundation for "the repo recreates the
-  cluster." Prereq groundwork already done: Helm values files are committed and faithful; secrets are
-  handled (gitignored + examples / documented).
-- **Cluster-recreate runbook** — an ordered, tested procedure in this README: Talos apply → bootstrap
-  → Cilium → CRDs → create secrets (list them) → Helm installs (`-f`) → apply manifests → verify.
-  Partially implied across sections; needs consolidating into one runbook. (Largely subsumed by
-  GitOps once that lands.)
-- **Capture remaining non-Helm bits as files** — the kubelet-serving-cert-approver (may now be
-  unneeded since cert rotation was reverted — verify), namespace PodSecurity labels, and the
-  create-first secret list (`grafana-oidc`, `loki-minio-creds`, `minio-backup-creds`,
-  `authelia-secrets`, etc. — these live outside git by design; the runbook must recreate them).
-- **Local-CA issuer** (cert-manager `CA` issuer from the existing root CA) — needed to give TLS to
-  `*.k8s.lan` / `*.lan` infrastructure services (Let's Encrypt can't issue for fake TLDs). This
-  project also **secures MinIO backups**: issue a MinIO server cert from the local CA, serve HTTPS
-  on optiplex, and point the `ObjectStore` at `https://` with `endpointCA` (closes the plaintext-HTTP
-  backup limitation noted above).
+- **GitOps (Argo CD)** — ✅ **DONE (2026-09-19).** Entire cluster migrated to Argo CD with the
+  app-of-apps pattern; secrets sealed into git via Sealed Secrets; auto-sync + self-heal on all apps
+  except CNPG (manual, for database safety). Git is now the source of truth — the drift class that
+  caused the outage and the `--reuse-values` divergence is structurally prevented. See the
+  [GitOps section](#gitops-argo-cd).
+- **Finish the cluster-recreate runbook** — the [GitOps bootstrap order](#gitops-argo-cd) covers the
+  sequence (Talos → Cilium → Argo → Sealed Secrets + restore master key → create not-in-git secrets →
+  apply root app). Still worth writing as one explicit, *tested* step-by-step runbook (and actually
+  rehearsing it), plus confirming the list of not-in-git secrets is complete.
 - **Grafana dashboards as code** — the hand-built dashboards live only in Grafana's ephemeral
   storage and are lost on a monitoring-stack reinstall. Provision them from labelled ConfigMaps
-  (`grafana_dashboard: "1"`) committed to git so they survive reinstalls.
+  (`grafana_dashboard: "1"`) committed to git so they survive reinstalls (and so they're GitOps-managed
+  like everything else).
 - **Re-test restores periodically** — a full restore was validated 2026-09-01 (see Backups). Repeat
   every few months, since a backup pipeline can break silently; consider a calendar reminder.
 - **Longhorn** (or another expansion-capable provisioner) — for storage that survives node loss and
@@ -681,41 +780,47 @@ Known items intentionally not done yet, captured so they aren't forgotten:
 
 ---
 
-## Repository layout (manifests)
-
-Representative — adjust to your tree.
+## Repository layout
 
 ```
-hosts/talos/
-├── common.yaml                 # shared Talos patch (install disk, VIP, Cilium-ready)
-├── controlplane-rpi-{1,2,3}.yaml  # per-node configs (GITIGNORED — embed secrets)
-├── cilium-lb.yaml              # LoadBalancer IP pool + L2 announcement policy
-├── gateway.yaml                # Gateway + HTTP/HTTPS listeners
-├── fivelabs-redirect.yaml      # catch-all HTTP→HTTPS redirect
-├── local-path/                 # local-path-provisioner (kustomize)
-├── letsencrypt-issuers.yaml    # ACME ClusterIssuers (Cloudflare DNS-01)
-├── fivelabs-cert.yaml          # wildcard Certificate (default ns)
-├── fivelabs-cert-auth.yaml     # wildcard Certificate (auth ns, for LDAPS)
-├── pg-cluster.yaml             # CNPG Cluster + managed.roles + backup plugin
-├── pg-lb.yaml                  # Postgres primary LoadBalancer (.202)
-├── pg-objectstore.yaml         # Barman Cloud ObjectStore -> MinIO on optiplex
-├── pg-scheduledbackup.yaml     # nightly base backup (08:00 UTC)
-├── technitium.yaml             # DNS DaemonSet + configurator sidecar
-├── lldap.yaml                  # LLDAP + Service + LDAPS LoadBalancer + HTTPRoute
-├── lldap-database.yaml         # CNPG Database CRD
-├── valkey.yaml                 # Valkey session store
-├── authelia-config.yaml        # Authelia ConfigMap (committable — no private keys)
-├── authelia.yaml               # Authelia Deployment + Service + HTTPRoute
-├── authelia-database.yaml      # CNPG Database CRD
-├── grafana-route.yaml          # Grafana HTTPRoute
-├── kube-prometheus-stack-values.yaml  # monitoring stack Helm values (Grafana OIDC + kubelet tlsConfig)
-├── loki-values.example.yaml    # Loki Helm values (real loki-values.yaml GITIGNORED — inline MinIO creds)
-├── alloy-values.yaml           # Alloy DaemonSet Helm values (log collection)
-└── loki-route.yaml             # Loki HTTPRoute (loki.fivelabs.tech, for the external app push)
-# Secrets (create-first, NOT in git): grafana-oidc, loki-minio-creds, minio-backup-creds, authelia-secrets
+hosts/talos/                        # Talos NODE config (managed by talosctl, NOT Argo)
+├── common.yaml                     # shared Talos patch (incl. allowSchedulingOnControlPlanes!)
+├── controlplane-rpi-{1,2,3}.yaml   # per-node configs (GITIGNORED — embed secrets)
+├── controlplane.yaml, worker.yaml  # base configs (GITIGNORED)
+└── apply.sh, build-talos-rpi-image.sh, rpi-schematic.yaml   # image/apply tooling
+
+clusters/rpi-cluster/               # everything INSIDE the cluster (Argo's domain)
+├── bootstrap/
+│   ├── argocd-values.yaml          # Argo CD Helm values (server.insecure — TLS at Gateway)
+│   └── argocd-route.yaml           # Argo CD HTTPRoute (argocd.fivelabs.tech)
+├── root/
+│   └── root-app.yaml               # app-of-apps root (watches apps/)
+├── apps/                           # one Argo Application per component
+│   ├── networking.yaml  storage.yaml  dns.yaml  cert-manager.yaml
+│   ├── identity.yaml  sealed-secrets.yaml  loki.yaml  alloy.yaml
+│   ├── monitoring.yaml             # (ServerSideApply + HTTPRoute ignoreDifferences)
+│   └── cnpg.yaml                   # (MANUAL sync, Prune=false, ignoreDifferences)
+└── manifests/                      # actual k8s YAML + Helm values, per component
+    ├── networking/   gateway.yaml, cilium-lb.yaml, fivelabs-redirect.yaml
+    ├── storage/      kustomization.yaml (local-path-provisioner)
+    ├── dns/          technitium.yaml
+    ├── cert-manager/ letsencrypt-issuers.yaml, fivelabs-cert*.yaml
+    ├── identity/     lldap.yaml, authelia.yaml, authelia-config.yaml, valkey.yaml
+    ├── cnpg/         pg-cluster.yaml (Delete=false), pg-lb, pg-objectstore,
+    │                 pg-scheduledbackup, {lldap,authelia}-database.yaml,
+    │                 minio-backup-sealedsecret.yaml
+    ├── monitoring/   kube-prometheus-stack-values.yaml, grafana-route.yaml,
+    │                 grafana-oidc-sealedsecret.yaml, grafana-admin-sealedsecret.yaml
+    ├── loki/         loki-values.yaml, loki-route.yaml, loki-s3-sealedsecret.yaml
+    └── alloy/        alloy-values.yaml
 ```
+
+**Not in git (by design):** Talos node configs (`controlplane-rpi-*.yaml`, `secrets.yaml`,
+`talosconfig`, `kubeconfig`), and the Sealed Secrets **master key** (backed up in the password
+manager). Application secrets ARE in git — encrypted as SealedSecrets. CNPG-generated secrets
+(`pg-app`, `pg-superuser`, TLS certs, `*-db-app`) are created by the operator, not stored anywhere.
 
 ---
 
-*Built and documented as a learning project. Secrets and node configs are intentionally excluded
-from version control.*
+*Built and documented as a learning project. Managed via GitOps (Argo CD). Talos node configs and the
+Sealed Secrets master key are intentionally excluded from version control.*

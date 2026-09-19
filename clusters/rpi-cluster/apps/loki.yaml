@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    # 1. the Loki Helm chart, configured by the values file from git (via $values)
+    - repoURL: https://grafana-community.github.io/helm-charts
+      chart: loki
+      targetRevision: 18.13.3
+      helm:
+        releaseName: loki
+        valueFiles:
+          - $values/clusters/rpi-cluster/manifests/loki/loki-values.yaml
+    # 2. git repo: provides the values file ($values) AND the extra manifests,
+    #    excluding the values YAMLs (they're Helm values, not k8s resources)
+    - repoURL: https://github.com/phil-harmoniq/homelab.git
+      targetRevision: main
+      ref: values
+      path: clusters/rpi-cluster/manifests/loki
+      directory:
+        exclude: '{loki-values.yaml,loki-values.example.yaml}'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: loki
+  syncPolicy: {}

@@ -38,3 +38,8 @@ grafana:
       use_pkce: true
     server:
       root_url: https://grafana.fivelabs.tech
+
+prometheus:
+  prometheusSpec:
+    scrapeInterval: 60s
+    evaluationInterval: 60s

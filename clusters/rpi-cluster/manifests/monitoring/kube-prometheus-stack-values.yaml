@@ -20,7 +20,7 @@ grafana:
     - name: grafana-oidc
   grafana.ini:
     auth:
-      disable_login_form: true
+      disable_login_form: false
     auth.generic_oauth:
       api_url: https://auth.fivelabs.tech/api/oidc/userinfo
       auth_url: https://auth.fivelabs.tech/api/oidc/authorization

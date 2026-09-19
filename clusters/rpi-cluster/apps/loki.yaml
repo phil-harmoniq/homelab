@@ -21,7 +21,7 @@ spec:
       ref: values
       path: clusters/rpi-cluster/manifests/loki
       directory:
-        exclude: '{loki-values.yaml,loki-values.example.yaml}'
+        exclude: 'loki-values.yaml'
   destination:
     server: https://kubernetes.default.svc
     namespace: loki

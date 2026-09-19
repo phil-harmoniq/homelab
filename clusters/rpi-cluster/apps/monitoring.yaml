@@ -6,7 +6,6 @@ metadata:
 spec:
   project: default
   sources:
-    # 1. kube-prometheus-stack Helm chart, configured by the values file from git
     - repoURL: https://prometheus-community.github.io/helm-charts
       chart: kube-prometheus-stack
       targetRevision: 91.4.0
@@ -14,8 +13,6 @@ spec:
         releaseName: prometheus
         valueFiles:
           - $values/clusters/rpi-cluster/manifests/monitoring/kube-prometheus-stack-values.yaml
-    # 2. git: values ref + extra manifests (grafana route, sealed secret),
-    #    excluding the values file (not a k8s resource)
     - repoURL: https://github.com/phil-harmoniq/homelab.git
       targetRevision: main
       ref: values
@@ -25,4 +22,6 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
-  syncPolicy: {}
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true

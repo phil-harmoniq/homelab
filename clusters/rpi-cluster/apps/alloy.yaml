@@ -19,4 +19,8 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: alloy
-  syncPolicy: {}
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+

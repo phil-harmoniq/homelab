@@ -25,4 +25,7 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: loki
-  syncPolicy: {}
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true

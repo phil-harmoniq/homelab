@@ -12,4 +12,7 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
-  syncPolicy: {}   # manual for now — you'll sync it to adopt the child apps
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true

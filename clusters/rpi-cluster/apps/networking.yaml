@@ -12,4 +12,7 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: default
-  syncPolicy: {}   # MANUAL — Argo will show diffs but won't change anything until you click Sync
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true   # MANUAL — Argo will show diffs but won't change anything until you click Sync

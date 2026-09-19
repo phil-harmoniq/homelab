@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cnpg
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/phil-harmoniq/homelab.git
+    targetRevision: main
+    path: clusters/rpi-cluster/manifests/cnpg
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      # NOTE: no automated prune; and Prune is disabled at sync time below
+  ignoreDifferences:
+    # CNPG heavily mutates the Cluster resource — ignore operator-managed fields
+    - group: postgresql.cnpg.io
+      kind: Cluster
+      jqPathExpressions:
+        - '.spec.instances'         # CNPG adjusts during failover
+        - '.status'                 # entirely operator-managed
+    - group: postgresql.cnpg.io
+      kind: Cluster
+      jsonPointers:
+        - /metadata/annotations/cnpg.io~1operatorVersion

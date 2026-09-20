@@ -95,6 +95,7 @@ spec:
       sectionName: https-fivelabs
   hostnames:
     - lldap.fivelabs.tech
+    - account.fivelabs.tech
   rules:
     - matches:
         - path: { type: PathPrefix, value: / }

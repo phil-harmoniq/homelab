@@ -1,0 +1,3 @@
+configs:
+  params:
+    server.insecure: true    # TLS terminated at the Gateway; Argo serves plain HTTP

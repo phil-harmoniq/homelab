@@ -1,0 +1,54 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg
+  namespace: default
+  annotations:
+    argocd.argoproj.io/sync-options: Delete=false
+spec:
+  enableSuperuserAccess: true
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:18-system-trixie
+
+  storage:
+    storageClass: local-path
+    size: 32Gi
+
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: required
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "512MB"
+      effective_cache_size: "1GB"
+      maintenance_work_mem: "128MB"
+      work_mem: "8MB"
+
+  managed:
+    roles:
+      - name: lldap
+        ensure: present
+        login: true
+        passwordSecret:
+          name: lldap-db-app
+      - name: authelia
+        ensure: present
+        login: true
+        passwordSecret:
+          name: authelia-db-app
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: minio-store

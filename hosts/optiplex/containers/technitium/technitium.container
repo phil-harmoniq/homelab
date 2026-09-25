@@ -7,6 +7,8 @@ ContainerName=technitium
 Environment=DNS_SERVER_DOMAIN=optiplex.dns
 HostName=optiplex.dns
 Image=docker.io/technitium/dns-server:15.5.0
+AutoUpdate=registry
+
 Network=host
 PublishPort=53:53/udp
 PublishPort=53:53/tcp

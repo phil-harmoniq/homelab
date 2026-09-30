@@ -58,6 +58,11 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    --ou|--organizational-unit)
+      organizational_unit="$2"
+      shift # past argument
+      shift # past value
+      ;;
     *)
       POSITIONAL_ARGS+=("$1") # save positional arg
       shift # past argument
@@ -103,6 +108,7 @@ DNS.5 = $hostname.woodsdr.fivelabs.tech"
 [[ -n $state ]] && CLIENT_SUBJECT="$CLIENT_SUBJECT/ST=$state"
 [[ -n $city ]] && CLIENT_SUBJECT="$CLIENT_SUBJECT/L=$city"
 [[ -n $organization ]] && CLIENT_SUBJECT="$CLIENT_SUBJECT/O=$organization"
+[[ -n $organizational_unit ]] && CLIENT_SUBJECT="$CLIENT_SUBJECT/OU=$organizational_unit"
 
 echo "Creating directory at $output_dir"
 mkdir -p "$output_dir"

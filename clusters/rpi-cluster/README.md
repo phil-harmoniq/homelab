@@ -47,6 +47,8 @@ the source of truth, and the cluster continuously reconciles to it.
     - [CNPG replica timeline divergence after multi-node reboot](#cnpg-replica-timeline-divergence-after-multi-node-reboot)
     - [Talos kubelet cert: metrics-server AND Prometheus scrapes](#talos-kubelet-cert-metrics-server-and-prometheus-scrapes)
     - [Post-recovery load imbalance](#post-recovery-load-imbalance)
+    - [Resurrected Flannel fighting Cilium (CNI conflict on reboot)](#resurrected-flannel-fighting-cilium-cni-conflict-on-reboot)
+    - [Orphaned resources from reverted experiments](#orphaned-resources-from-reverted-experiments)
     - [General recovery order](#general-recovery-order)
   - [Updating components](#updating-components)
   - [Deferred / future work](#deferred--future-work)
@@ -681,6 +683,57 @@ starved of CPU can't bind its port before the probe times out — `2/3` DaemonSe
 `connection refused` on the readiness probe, always the same node). `kubectl top nodes` shows that
 node much hotter than the others. A rollout restart (or deleting the packed node's heavier pods to
 let them reschedule) rebalances; Kubernetes does not auto-rebalance on its own.
+
+### Resurrected Flannel fighting Cilium (CNI conflict on reboot)
+
+The nastiest one: after a node reboot, CNPG (and any cross-node pod traffic) failed with `no route to
+host` / API-server `i/o timeout`, and pods on the affected node were isolated. It looked like a
+database failure but was a **CNI conflict two layers below**.
+
+- **Root cause:** a stale `kube-flannel` DaemonSet — leftover from the original Flannel→Cilium
+  migration, never fully removed — had reactivated and was running its dataplane *alongside* Cilium.
+  On reboot, Flannel and Cilium fought for pod networking per-node; whichever won left the other's
+  pods unroutable. Only the node(s) where Flannel dominated broke, which is why it looked node-specific.
+- **The tells:**
+  - `cni0` bridge + `veth*` ports in `talosctl dmesg` (that's Flannel's bridge; Cilium uses
+    `cilium_host`/`cilium_net`/`lxc*`, never `cni0`).
+  - `/etc/cni/net.d/` showing `05-cilium.conflist` next to `10-flannel.conflist.cilium_bak` (Cilium
+    had *disabled* Flannel's config during migration — the `.cilium_bak` suffix — but a live Flannel
+    DaemonSet was overriding that).
+  - `kubectl -n kube-system get daemonset | grep flannel` returning a DaemonSet that **should not
+    exist**.
+- **Fix:**
+  1. `kubectl -n kube-system delete daemonset kube-flannel` (confirm it's NOT in git first — it
+     wasn't, so Argo won't recreate it; it was an orphaned in-cluster remnant).
+  2. **Reboot each node one at a time** (quorum-safe) to clear the stale `cni0`/Flannel dataplane so
+     Cilium (`05-cilium.conflist`) is the sole CNI. Verify no `cni0` in dmesg after each.
+- **CNPG aftermath:** the networking isolation caused an uncoordinated failover — the old primary
+  (pg-1) ended up with **diverged data** (`pg_rewind: servers diverged at WAL location ... could not
+  restore file ... from archive`), stuck `1/2`. Fix: recycle the diverged instance (delete its PVC +
+  pod), CNPG re-clones it fresh from the healthy primary. Confirm the primary has your data first.
+- **Lesson:** when "a service is down" after a reboot, check the **CNI layer** before the service. A
+  leftover DaemonSet from an old migration is exactly the kind of orphan that GitOps + `kubectl get
+  daemonset -A` audits would have caught earlier — worth periodically auditing for in-cluster
+  resources that aren't in git.
+
+### Orphaned resources from reverted experiments
+
+This incident surfaced **two** orphaned resources — both installed manually via `kubectl apply`
+during exploration, then left behind when the approach was abandoned, and neither in git:
+- the **`kube-flannel` DaemonSet** (from the pre-Cilium era) — caused the CNI conflict above.
+- the **`kubelet-serving-cert-approver`** (from the abandoned kubelet-cert-rotation attempt, which
+  was reverted in favour of `--kubelet-insecure-tls`) — sat in `CrashLoopBackOff` doing nothing (no
+  CSRs to approve).
+
+Both were removed (`kubectl delete daemonset kube-flannel`, `kubectl delete namespace
+kubelet-serving-cert-approver`). **Pattern: reverted experiments can leave orphaned in-cluster
+resources that GitOps doesn't manage.** Now that git is the source of truth, anything *running* that
+isn't *in git* is suspect. Periodic hygiene:
+```
+# list workloads and compare against the repo; investigate anything unfamiliar
+kubectl get daemonset,deployment,statefulset -A -o name | sort
+grep -rl "<name>" clusters/rpi-cluster/ || echo "<name> not in git — orphan?"
+```
 
 ### General recovery order
 

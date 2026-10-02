@@ -48,7 +48,7 @@ spec:
               while true; do sleep 3600; done
       containers:
         - name: technitium
-          image: technitium/dns-server:15.4.0
+          image: technitium/dns-server:15.5.0
           env:
             - name: NODE_NAME
               valueFrom: { fieldRef: { fieldPath: spec.nodeName } }

@@ -26,7 +26,7 @@ Environment=FTLCONF_dns_listeningMode=all
 Environment="DB_POSTGRES_HOST=postgres"
 Environment="DB_POSTGRES_PORT=5432"
 Environment="DB_POSTGRES_USER=nginx"
-Environment="DB_POSTGRES_PASSWORD=***REMOVED***"
+Secret=nginx-db-password,type=env,target=DB_POSTGRES_PASSWORD
 Environment="DB_POSTGRES_NAME=nginx"
 
 Volume=nginx-data-2:/data:z

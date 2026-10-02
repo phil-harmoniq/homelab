@@ -36,10 +36,14 @@ Volume=%h/homelab/hosts/optiplex/.certs-backup/optiplex.root.cert:/etc/ssl/certs
 Volume=%h/homelab/hosts/optiplex/containers/gitea-runner/buildkitd.toml:/etc/buildkit/buildkitd.toml:z
 Volume=%h/homelab/hosts/optiplex/containers/gitea-runner/config.yaml:/config.yaml:z
 
+# Secrets
+# Only used for the first registration; afterwards the runner authenticates with /data/.runner
+Secret=gitea-runner-registration-token
+
 # Environment variables
 Environment=CONFIG_FILE=/config.yaml
 Environment=GITEA_INSTANCE_URL=https://gitea.fivelabs.tech
-Environment=GITEA_RUNNER_REGISTRATION_TOKEN=***REMOVED***
+Environment=GITEA_RUNNER_REGISTRATION_TOKEN_FILE=/run/secrets/gitea-runner-registration-token
 Environment=GITEA_RUNNER_NAME=gitea-runner
 Environment=DOCKER_HOST=unix:///run/user/1000/podman/podman.sock
 Environment=GIT_SSL_NO_VERIFY=true

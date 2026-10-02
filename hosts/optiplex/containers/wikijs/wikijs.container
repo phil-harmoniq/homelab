@@ -1,23 +1,34 @@
 [Unit]
 Description=Wiki.js documentation server
-After=network-online.target
+Requires=postgres.service
+After=postgres.service
+
+Requires=devops.network
+After=devops.network
 
 [Container]
 ContainerName=wiki
-HostName=wiki
 Image=ghcr.io/requarks/wiki:2
-PublishPort=8080:3000/tcp
-Network=devops
 AutoUpdate=registry
 
-HealthCmd=curl -k http://127.0.0.1:3000
+HealthCmd=curl -f http://127.0.0.1:3000
+
+Network=devops
+HostName=wiki
+
+# Secrets
+Secret=wikijs-db-password
 
 Environment=DB_TYPE=postgres
 Environment=DB_HOST=postgres
 Environment=DB_PORT=5432
 Environment=DB_USER=wiki
-Environment=DB_PASS=***REMOVED***
+Environment=DB_PASS_FILE=/run/secrets/wikijs-db-password
 Environment=DB_NAME=wiki
 
 [Service]
 Restart=always
+TimeoutStartSec=60
+
+[Install]
+WantedBy=default.target

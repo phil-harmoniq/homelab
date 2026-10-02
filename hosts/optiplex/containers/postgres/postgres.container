@@ -16,7 +16,9 @@ Network=devops
 HostName=postgres
 PublishPort=5432:5432
 
-Environment=POSTGRES_PASSWORD=***REMOVED***
+# Only used by initdb when the data volume is empty; change it later with ALTER ROLE
+Secret=postgres-superuser-password
+Environment=POSTGRES_PASSWORD_FILE=/run/secrets/postgres-superuser-password
 
 Volume=postgres-data-18:/var/lib/postgresql/18/docker:Z
 

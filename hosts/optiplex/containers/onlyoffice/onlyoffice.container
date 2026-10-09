@@ -7,6 +7,11 @@ Wants=network-online.target
 ContainerName=onlyoffice
 Image=docker.io/onlyoffice/documentserver:9.4.0
 AutoUpdate=registry
+
+# Returns "true" once the document server and its bundled services are up
+HealthCmd=curl -fsS http://127.0.0.1/healthcheck | grep -q true
+HealthInterval=1m
+HealthStartPeriod=3m
 Network=devops
 Volume=onlyoffice-data:/var/www/onlyoffice/Data
 Volume=onlyoffice-log:/var/log/onlyoffice

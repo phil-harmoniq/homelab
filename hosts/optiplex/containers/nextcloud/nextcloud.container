@@ -8,6 +8,12 @@ Requires=postgres.service valkey.service
 ContainerName=nextcloud
 Image=docker.io/library/nextcloud:apache
 AutoUpdate=registry
+
+# Unhealthy while in maintenance mode (e.g. during upgrades), not just when Apache is down
+HealthCmd=curl -fsS http://127.0.0.1/status.php | grep -q '"maintenance":false'
+HealthInterval=1m
+# First install and major upgrades run before Apache starts
+HealthStartPeriod=10m
 Network=devops
 Volume=nextcloud-data:/var/www/html
 

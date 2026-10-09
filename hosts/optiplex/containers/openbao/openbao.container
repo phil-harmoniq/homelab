@@ -8,7 +8,9 @@ ContainerName=openbao
 Image=ghcr.io/openbao/openbao:2
 AutoUpdate=registry
 
-# HealthCmd="wget -O - --no-check-certificate https://localhost:443/misc/ping"
+# Non-2xx (sealed 503, uninitialized 501, standby 429) fails the check
+HealthCmd=wget -qO /dev/null http://127.0.0.1:8200/v1/sys/health
+HealthStartPeriod=30s
 
 Network=devops
 HostName=openbao

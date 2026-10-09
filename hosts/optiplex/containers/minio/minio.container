@@ -5,6 +5,9 @@ After=network-online.target
 [Container]
 ContainerName=minio
 Image=quay.io/minio/minio:latest
+
+HealthCmd=curl -fsS -o /dev/null http://127.0.0.1:9000/minio/health/live
+HealthStartPeriod=30s
 Network=host
 Exec=server /data --console-address ":9001"
 Environment=MINIO_ROOT_USER=admin

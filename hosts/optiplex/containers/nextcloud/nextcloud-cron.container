@@ -7,6 +7,12 @@ Requires=nextcloud.service
 ContainerName=nextcloud-cron
 Image=docker.io/library/nextcloud:apache
 AutoUpdate=registry
+
+# Fails if the shared install is unreadable, in maintenance mode, or needs an upgrade
+HealthCmd=su -s /bin/sh www-data -c 'php -f /var/www/html/occ status -e'
+HealthInterval=5m
+HealthStartPeriod=10m
+
 Network=devops.network
 Volume=nextcloud-data:/var/www/html
 Exec=/cron.sh

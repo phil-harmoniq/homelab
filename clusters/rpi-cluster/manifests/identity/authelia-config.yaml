@@ -67,6 +67,8 @@ data:
             id_token: ['email', 'name', 'groups', 'preferred_username']
           nextcloud:
             id_token: ['groups', 'email', 'name', 'preferred_username']
+          wikijs:
+            id_token: ['email', 'name', 'groups', 'preferred_username']
         clients:
           - client_id: 'gitea'
             client_name: 'Gitea'
@@ -125,6 +127,26 @@ data:
             authorization_policy: 'one_factor'
             redirect_uris:
               - 'https://grafana.fivelabs.tech/login/generic_oauth'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            response_types:
+              - 'code'
+            grant_types:
+              - 'authorization_code'
+            token_endpoint_auth_method: 'client_secret_post'
+            userinfo_signed_response_alg: 'none'
+          - client_id: 'wikijs'
+            claims_policy: 'wikijs'
+            client_name: 'Wiki.js'
+            client_secret: '$pbkdf2-sha512$310000$dnCgkxeRWMR0aGqKznqD2g$Q5xZc65KaVA5qyqOwGrKg0mRGOfQxDGa0paOrqpm7LiLYuth/8ap98aNYBr.L/XS8lLT45twFL1KAxUixWGgFw'
+            public: false
+            consent_mode: 'implicit'
+            authorization_policy: 'one_factor'
+            redirect_uris:
+              - 'https://wiki.fivelabs.tech/login/WIKIJS_STRATEGY_ID/callback'
             scopes:
               - 'openid'
               - 'profile'

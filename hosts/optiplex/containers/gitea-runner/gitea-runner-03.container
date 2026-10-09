@@ -14,6 +14,10 @@ After=nginx.service
 Requires=gitea.service
 After=gitea.service
 
+# Gitea/nginx may still be starting when the runner comes up (connection refused / 502),
+# and act_runner exits immediately on failure; keep retrying instead of hitting the start limit
+StartLimitIntervalSec=0
+
 [Container]
 # Image
 Image=docker.io/gitea/act_runner:latest
@@ -53,6 +57,7 @@ Environment=BUILDKITD_FLAGS=--config=/etc/buildkit/buildkitd.toml
 
 [Service]
 Restart=always
+RestartSec=10
 TimeoutStartSec=1000
 
 [Install]

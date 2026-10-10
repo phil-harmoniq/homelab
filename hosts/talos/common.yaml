@@ -9,6 +9,9 @@ machine:
         dhcp: true
         vip:
           ip: 10.1.1.10
+    nameservers:
+      - 10.1.1.2
+      - 1.1.1.1
   sysctls:
     vm.dirty_writeback_centisecs: "1500"
 cluster:

@@ -6,7 +6,7 @@ After=network-online.target
 ContainerName=technitium
 Environment=DNS_SERVER_DOMAIN=optiplex.dns
 HostName=optiplex.dns
-Image=docker.io/technitium/dns-server:15.5.0
+Image=docker.io/technitium/dns-server:15.6.1
 AutoUpdate=registry
 
 Network=host
@@ -20,3 +20,6 @@ Volume=technitium-data:/etc/dns
 
 [Service]
 Restart=always
+
+[Install]
+WantedBy=default.target

@@ -1,5 +1,6 @@
 [Container]
 Image=docker.io/jellyfin/jellyfin:12
+AutoUpdate=registry
 ContainerName=jellyfin
 # Host networking is simplest for local LAN streaming
 Network=devops

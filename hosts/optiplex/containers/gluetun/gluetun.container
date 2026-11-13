@@ -24,11 +24,14 @@ HealthInterval=10s
 HealthTimeout=5s
 HealthStartPeriod=20s
 HealthRetries=3
+HealthOnFailure=kill
 
 [Service]
 Restart=always
 TimeoutStopSec=30
 Notify=healthy
+StartLimitBurst=5
+StartLimitIntervalSec=90
 
 [Install]
 WantedBy=default.target

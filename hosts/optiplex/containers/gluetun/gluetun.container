@@ -23,7 +23,7 @@ HealthCmd=/gluetun-entrypoint healthcheck
 HealthInterval=10s
 HealthTimeout=5s
 HealthStartPeriod=20s
-HealthRetries=3
+HealthRetries=5
 HealthOnFailure=kill
 
 [Service]
